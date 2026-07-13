@@ -43,6 +43,8 @@ export function mapMaterialToCardModel(item) {
     stats: {
       viewCount: item.stats?.view_count ?? 0,
       downloadCount: item.stats?.download_count ?? 0,
+      ratingCount: item.stats?.rating_count ?? 0,
+      ratingAvg: item.stats?.rating_avg ?? 0,
     },
 
     userState: {
@@ -69,6 +71,24 @@ export function sortMaterials(items = [], sort = "Sort by New") {
     case "Title Descending":
       return list.sort((a, b) => b.title.localeCompare(a.title));
 
+    case "Most Viewed":
+      return list.sort(
+        (a, b) =>
+          (b.stats?.viewCount ?? 0) - (a.stats?.viewCount ?? 0),
+      );
+
+    case "Most Downloaded":
+      return list.sort(
+        (a, b) =>
+          (b.stats?.downloadCount ?? 0) - (a.stats?.downloadCount ?? 0),
+      );
+
+    case "Highest Rated":
+      return list.sort(
+        (a, b) =>
+          (b.stats?.ratingAvg ?? 0) - (a.stats?.ratingAvg ?? 0),
+      );
+
     case "Sort by New":
     default:
       return list.sort(
@@ -77,3 +97,12 @@ export function sortMaterials(items = [], sort = "Sort by New") {
       );
   }
 }
+
+export const SORT_TO_API = {
+  "Sort by New": "recent",
+  "Most Viewed": "most_viewed",
+  "Most Downloaded": "most_downloaded",
+  "Highest Rated": "highest_rated",
+  "Title Ascending": "alphabetical",
+  "Title Descending": "recent",
+};

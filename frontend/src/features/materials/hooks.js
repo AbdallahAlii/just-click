@@ -80,6 +80,7 @@ export function useInfiniteMaterialsList(baseParams = {}, options = {}) {
       }
       return undefined;
     },
+    placeholderData: (previousData) => previousData,
     ...options,
   });
 }
@@ -276,6 +277,83 @@ export function useTrackMaterialDownload(options = {}) {
         options.onSuccess(data, id, context);
       }
     },
+    ...options,
+  });
+}
+
+export function useMaterialFeedback(materialId, options = {}) {
+  return useQuery({
+    queryKey: materialsKeys.feedback(materialId),
+    queryFn: () => materialsApi.getMaterialFeedback(materialId),
+    enabled: !!materialId,
+    ...options,
+  });
+}
+
+export function useSubmitMaterialFeedback(options = {}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: materialsApi.submitFeedback,
+    onSuccess: (data, variables, context) => {
+      const id = variables?.materialId;
+      if (id) {
+        queryClient.invalidateQueries({ queryKey: materialsKeys.feedback(id) });
+        queryClient.invalidateQueries({ queryKey: materialsKeys.detail(id) });
+        queryClient.invalidateQueries({ queryKey: materialsKeys.lists() });
+      }
+      if (options.onSuccess) options.onSuccess(data, variables, context);
+    },
+    ...options,
+  });
+}
+
+export function useAdminMaterialFeedback(params = {}, options = {}) {
+  return useQuery({
+    queryKey: materialsKeys.adminFeedback(params),
+    queryFn: () => materialsApi.getAdminFeedback(params),
+    ...options,
+  });
+}
+
+export function useReplyMaterialFeedback(options = {}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: materialsApi.replyFeedback,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: materialsKeys.root });
+      if (options.onSuccess) options.onSuccess();
+    },
+    ...options,
+  });
+}
+
+export function useResolveMaterialFeedback(options = {}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: materialsApi.resolveFeedback,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: materialsKeys.root });
+      if (options.onSuccess) options.onSuccess();
+    },
+    ...options,
+  });
+}
+
+export function useMaterialAccessReports(params = {}, options = {}) {
+  return useQuery({
+    queryKey: materialsKeys.accessReports(params),
+    queryFn: () => materialsApi.getAccessReports(params),
+    staleTime: 60 * 1000,
+    ...options,
+  });
+}
+
+export function useMaterialFeedbackAdminSummary(options = {}) {
+  return useQuery({
+    queryKey: materialsKeys.adminFeedbackSummary(),
+    queryFn: () => materialsApi.getAdminFeedbackSummary(),
+    staleTime: 30 * 1000,
     ...options,
   });
 }

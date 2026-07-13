@@ -23,4 +23,9 @@ export const materialsKeys = {
   update: (id) => [...materialsKeys.root, "update", id],
   delete: (id) => [...materialsKeys.root, "delete", id],
   bulkDelete: () => [...materialsKeys.root, "bulk-delete"],
+
+  feedback: (materialId) => [...materialsKeys.root, "feedback", materialId],
+  adminFeedback: (params = {}) => [...materialsKeys.root, "admin-feedback", params],
+  accessReports: (params = {}) => [...materialsKeys.root, "access-reports", params],
+  adminFeedbackSummary: () => [...materialsKeys.root, "admin-feedback-summary"],
 };

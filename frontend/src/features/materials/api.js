@@ -161,4 +161,42 @@ export const materialsApi = {
     fetchJSON(`/materials/${id}/download`, {
       method: "POST",
     }),
+
+  submitFeedback: ({ materialId, payload }) =>
+    fetchJSON(`/materials/${materialId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getMaterialFeedback: (materialId, params = {}) =>
+    fetchJSON(`/materials/${materialId}/feedback${toQueryString(params)}`, {
+      method: "GET",
+    }),
+
+  getAdminFeedback: (params = {}) =>
+    fetchJSON(`/materials/feedback/admin${toQueryString(params)}`, {
+      method: "GET",
+    }),
+
+  replyFeedback: ({ feedbackId, admin_reply }) =>
+    fetchJSON(`/materials/feedback/${feedbackId}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ admin_reply }),
+    }),
+
+  resolveFeedback: ({ feedbackId, admin_reply }) =>
+    fetchJSON(`/materials/feedback/${feedbackId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify({ admin_reply: admin_reply || undefined }),
+    }),
+
+  getAccessReports: (params = {}) =>
+    fetchJSON(`/materials/reports/access${toQueryString(params)}`, {
+      method: "GET",
+    }),
+
+  getAdminFeedbackSummary: () =>
+    fetchJSON("/materials/feedback/admin/summary", {
+      method: "GET",
+    }),
 };

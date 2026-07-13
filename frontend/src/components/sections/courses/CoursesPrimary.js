@@ -11,9 +11,10 @@ import {
 import {
   flattenInfiniteMaterials,
   mapMaterialToCardModel,
-  sortMaterials,
+  SORT_TO_API,
 } from "@/features/materials/utils";
 import useIntersectionLoadMore from "@/hooks/useIntersectionLoadMore";
+import { useDebounce } from "@/hooks/dropdown/useDebounce";
 import useTab from "@/hooks/useTab";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -22,7 +23,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 /* Constants                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const sortInputs = ["Sort by New", "Title Ascending", "Title Descending"];
+const sortInputs = [
+  "Sort by New",
+  "Most Viewed",
+  "Most Downloaded",
+  "Highest Rated",
+  "Title Ascending",
+];
+
+const MATERIAL_TYPE_OPTIONS = [
+  { value: "pdf", label: "PDF" },
+  { value: "slides", label: "Slides / PPT" },
+  { value: "doc", label: "Document" },
+  { value: "video", label: "Video" },
+  { value: "link", label: "Link" },
+  { value: "other", label: "Other" },
+];
 
 /* -------------------------------------------------------------------------- */
 /* Skeleton Loaders                                                           */
@@ -89,8 +105,8 @@ const FilterChip = ({ label, active, count, onClick, disabled }) => (
       w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm transition-all mb-1
       ${
         active
-          ? "bg-primaryColor text-white shadow-md shadow-primaryColor/20 dark:shadow-none"
-          : "bg-white dark:bg-gray-800/60 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700/50"
+          ? "bg-ds-action text-white shadow-sm"
+          : "bg-ds-surface text-ds-text-secondary hover:bg-ds-surface-hover border border-ds-border"
       }
       ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}
     `}
@@ -100,8 +116,8 @@ const FilterChip = ({ label, active, count, onClick, disabled }) => (
       <span
         className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
           active
-            ? "bg-white/20 text-white"
-            : "bg-gray-100 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400"
+            ? "bg-ds-surface-elevated text-white"
+            : "bg-ds-surface-secondary text-ds-text-muted"
         }`}
       >
         {formatCount(count)}
@@ -113,11 +129,11 @@ const FilterChip = ({ label, active, count, onClick, disabled }) => (
 const FilterSection = ({ title, children, disabled = false, badge }) => (
   <div className="mb-6">
     <div className="flex items-center justify-between px-1 mb-3">
-      <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+      <span className="text-[10px] font-bold text-ds-text-muted uppercase tracking-widest">
         {title}
       </span>
       {badge && !disabled && (
-        <span className="text-[9px] px-2 py-0.5 bg-primaryColor/10 text-primaryColor rounded-full font-bold">
+        <span className="text-[9px] px-2 py-0.5 bg-ds-action/10 text-ds-action rounded-full font-bold">
           {badge}
         </span>
       )}
@@ -135,8 +151,8 @@ const ViewToggle = ({ currentIdx, onChange }) => (
       onClick={() => onChange(0)}
       className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${
         currentIdx === 0
-          ? "bg-gray-100 dark:bg-gray-700 text-primaryColor shadow-sm"
-          : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          ? "bg-ds-surface-hover text-ds-action shadow-sm"
+          : "text-ds-text-muted hover:text-ds-text-secondary"
       }`}
       aria-label="Grid view"
     >
@@ -148,13 +164,164 @@ const ViewToggle = ({ currentIdx, onChange }) => (
       onClick={() => onChange(1)}
       className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${
         currentIdx === 1
-          ? "bg-gray-100 dark:bg-gray-700 text-primaryColor shadow-sm"
-          : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          ? "bg-ds-surface-hover text-ds-action shadow-sm"
+          : "text-ds-text-muted hover:text-ds-text-secondary"
       }`}
       aria-label="List view"
     >
       <i className="icofont-listine-dots text-lg" />
     </button>
+  </div>
+);
+
+const MaterialsSidebarFilters = ({
+  mobile = false,
+  currentIdx,
+  onViewChange,
+  searchString,
+  onSearchChange,
+  isSearchPending,
+  isSearchFetching,
+  semesters,
+  courses,
+  chapters,
+  selectedSemester,
+  selectedCourse,
+  selectedChapter,
+  onSemesterChange,
+  onCourseChange,
+  onChapterChange,
+  isFilterOptionsLoading,
+  isFilterOptionsFetching,
+}) => (
+  <div className="space-y-4">
+    {mobile && (
+      <FilterSection title="View">
+        <ViewToggle currentIdx={currentIdx} onChange={onViewChange} />
+      </FilterSection>
+    )}
+
+    <FilterSection title="Search">
+      <div className="relative group">
+        <input
+          type="text"
+          placeholder="Search materials..."
+          value={searchString}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full px-4 py-3 pl-10 pr-10 bg-ds-surface-input border border-ds-border rounded-xl text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-focus transition-all text-ds-text-primary placeholder:text-ds-text-muted"
+        />
+        <i className="icofont-search-1 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primaryColor transition-colors" />
+        {(isSearchPending || isSearchFetching) && (
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primaryColor/30 border-t-primaryColor rounded-full animate-spin" />
+        )}
+      </div>
+    </FilterSection>
+
+    <FilterSection
+      title="Semester"
+      badge={semesters.length ? `${semesters.length}` : undefined}
+    >
+      {isFilterOptionsLoading ? (
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <div
+              key={i}
+              className="h-11 rounded-xl bg-gray-100 dark:bg-gray-800/60 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+          {semesters.map((sem) => (
+            <FilterChip
+              key={sem.id}
+              label={sem.label}
+              count={sem.count}
+              active={selectedSemester === sem.id}
+              onClick={() => onSemesterChange(sem.id)}
+            />
+          ))}
+        </div>
+      )}
+    </FilterSection>
+
+    <FilterSection
+      title="Course"
+      disabled={!selectedSemester}
+      badge={courses.length ? `${courses.length}` : undefined}
+    >
+      {!selectedSemester ? (
+        <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
+          Select a semester first
+        </div>
+      ) : isFilterOptionsFetching ? (
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => (
+            <div
+              key={i}
+              className="h-11 rounded-xl bg-gray-100 dark:bg-gray-800/60 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+          {courses.length ? (
+            courses.map((course) => (
+              <FilterChip
+                key={course.id}
+                label={course.label}
+                count={course.count}
+                active={selectedCourse === course.id}
+                onClick={() => onCourseChange(course.id)}
+              />
+            ))
+          ) : (
+            <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
+              No courses found
+            </div>
+          )}
+        </div>
+      )}
+    </FilterSection>
+
+    <FilterSection
+      title="Chapter"
+      disabled={!selectedCourse}
+      badge={chapters.length ? `${chapters.length}` : undefined}
+    >
+      {!selectedCourse ? (
+        <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
+          Select a course first
+        </div>
+      ) : isFilterOptionsFetching ? (
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => (
+            <div
+              key={i}
+              className="h-11 rounded-xl bg-gray-100 dark:bg-gray-800/60 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+          {chapters.length ? (
+            chapters.map((chapter) => (
+              <FilterChip
+                key={chapter.id}
+                label={chapter.label}
+                count={chapter.count}
+                active={selectedChapter === chapter.id}
+                onClick={() => onChapterChange(chapter.id)}
+              />
+            ))
+          ) : (
+            <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
+              No chapters found
+            </div>
+          )}
+        </div>
+      )}
+    </FilterSection>
   </div>
 );
 
@@ -186,6 +353,10 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     searchParams.get("ch") ? Number(searchParams.get("ch")) : null,
   );
   const [searchString, setSearchString] = useState(searchParams.get("q") || "");
+  const debouncedSearch = useDebounce(searchString, 500);
+  const [selectedMaterialType, setSelectedMaterialType] = useState(
+    searchParams.get("type") || "",
+  );
   const [sortInput, setSortInput] = useState(
     searchParams.get("sort") || "Sort by New",
   );
@@ -217,7 +388,8 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
       sem: selectedSemester,
       course: selectedCourse,
       ch: selectedChapter,
-      q: searchString || null,
+      q: debouncedSearch || null,
+      type: selectedMaterialType || null,
       sort: sortInput !== "Sort by New" ? sortInput : null,
       favorite: favoriteOnly ? "true" : null,
     });
@@ -225,7 +397,8 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     selectedSemester,
     selectedCourse,
     selectedChapter,
-    searchString,
+    debouncedSearch,
+    selectedMaterialType,
     sortInput,
     favoriteOnly,
     updateURL,
@@ -236,8 +409,14 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
       semester_id: selectedSemester || undefined,
       course_id: selectedCourse || undefined,
       chapter_id: selectedChapter || undefined,
+      material_type: selectedMaterialType || undefined,
     }),
-    [selectedSemester, selectedCourse, selectedChapter],
+    [
+      selectedSemester,
+      selectedCourse,
+      selectedChapter,
+      selectedMaterialType,
+    ],
   );
 
   const {
@@ -259,7 +438,12 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
       semester_id: selectedSemester || undefined,
       course_id: selectedCourse || undefined,
       chapter_id: selectedChapter || undefined,
-      search: searchString || undefined,
+      material_type: selectedMaterialType || undefined,
+      search: debouncedSearch || undefined,
+      sort_by:
+        SORT_TO_API[sortInput] && SORT_TO_API[sortInput] !== "recent"
+          ? SORT_TO_API[sortInput]
+          : undefined,
       is_enabled: true,
       is_favorite: favoriteOnly || undefined,
     }),
@@ -267,7 +451,9 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
       selectedSemester,
       selectedCourse,
       selectedChapter,
-      searchString,
+      selectedMaterialType,
+      debouncedSearch,
+      sortInput,
       favoriteOnly,
     ],
   );
@@ -313,8 +499,8 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
       ? mapped.filter((item) => item.isFavorite)
       : mapped;
 
-    return sortMaterials(visibleMaterials, sortInput);
-  }, [data?.pages, sortInput, favoriteOverrides, favoriteOnly]);
+    return visibleMaterials;
+  }, [data?.pages, favoriteOverrides, favoriteOnly]);
 
   const totalCount =
     data?.pages?.[0]?.data?.meta?.total_count ??
@@ -325,16 +511,22 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     !!selectedSemester ||
     !!selectedCourse ||
     !!selectedChapter ||
-    !!searchString ||
+    !!selectedMaterialType ||
+    !!debouncedSearch ||
     !!favoriteOnly;
 
   const activeFilterCount = [
     selectedSemester,
     selectedCourse,
     selectedChapter,
-    searchString,
+    selectedMaterialType,
+    debouncedSearch,
     favoriteOnly ? "favorite" : null,
   ].filter(Boolean).length;
+
+  const isSearchPending = searchString !== debouncedSearch;
+  const isSearchFetching = isFetching && !isFetchingNextPage;
+  const isInitialLoading = isLoading && !(data?.pages?.length);
 
   const handleSemesterChange = (semId) => {
     const nextValue = selectedSemester === semId ? null : semId;
@@ -358,6 +550,7 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     setSelectedSemester(null);
     setSelectedCourse(null);
     setSelectedChapter(null);
+    setSelectedMaterialType("");
     setSearchString("");
     setSortInput("Sort by New");
     setFavoriteOnly(false);
@@ -449,145 +642,36 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     onLoadMore: fetchNextPage,
   });
 
-  const SidebarContent = ({ mobile = false }) => (
-    <div className="space-y-4">
-      {mobile && (
-        <FilterSection title="View">
-          <ViewToggle currentIdx={currentIdx} onChange={handleViewChange} />
-        </FilterSection>
-      )}
-
-      <FilterSection title="Search">
-        <div className="relative group">
-          <input
-            type="text"
-            placeholder="Search materials..."
-            value={searchString}
-            onChange={(e) => setSearchString(e.target.value)}
-            className="w-full px-4 py-3 pl-10 bg-white dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700/50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primaryColor/20 transition-all text-gray-700 dark:text-gray-200"
-          />
-          <i className="icofont-search-1 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primaryColor transition-colors" />
-        </div>
-      </FilterSection>
-
-      <FilterSection
-        title="Semester"
-        badge={semesters.length ? `${semesters.length}` : undefined}
-      >
-        {isFilterOptionsLoading ? (
-          <div className="space-y-2">
-            {[...Array(4)].map((_, i) => (
-              <div
-                key={i}
-                className="h-11 rounded-xl bg-gray-100 dark:bg-gray-800/60 animate-pulse"
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-            {semesters.map((sem) => (
-              <FilterChip
-                key={sem.id}
-                label={sem.label}
-                count={sem.count}
-                active={selectedSemester === sem.id}
-                onClick={() => handleSemesterChange(sem.id)}
-              />
-            ))}
-          </div>
-        )}
-      </FilterSection>
-
-      <FilterSection
-        title="Course"
-        disabled={!selectedSemester}
-        badge={courses.length ? `${courses.length}` : undefined}
-      >
-        {!selectedSemester ? (
-          <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
-            Select a semester first
-          </div>
-        ) : isFilterOptionsFetching ? (
-          <div className="space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <div
-                key={i}
-                className="h-11 rounded-xl bg-gray-100 dark:bg-gray-800/60 animate-pulse"
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-            {courses.length ? (
-              courses.map((course) => (
-                <FilterChip
-                  key={course.id}
-                  label={course.label}
-                  count={course.count}
-                  active={selectedCourse === course.id}
-                  onClick={() => handleCourseChange(course.id)}
-                />
-              ))
-            ) : (
-              <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
-                No courses found
-              </div>
-            )}
-          </div>
-        )}
-      </FilterSection>
-
-      <FilterSection
-        title="Chapter"
-        disabled={!selectedCourse}
-        badge={chapters.length ? `${chapters.length}` : undefined}
-      >
-        {!selectedCourse ? (
-          <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
-            Select a course first
-          </div>
-        ) : isFilterOptionsFetching ? (
-          <div className="space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <div
-                key={i}
-                className="h-11 rounded-xl bg-gray-100 dark:bg-gray-800/60 animate-pulse"
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-            {chapters.length ? (
-              chapters.map((chapter) => (
-                <FilterChip
-                  key={chapter.id}
-                  label={chapter.label}
-                  count={chapter.count}
-                  active={selectedChapter === chapter.id}
-                  onClick={() => handleChapterChange(chapter.id)}
-                />
-              ))
-            ) : (
-              <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
-                No chapters found
-              </div>
-            )}
-          </div>
-        )}
-      </FilterSection>
-    </div>
-  );
+  const sidebarProps = {
+    currentIdx,
+    onViewChange: handleViewChange,
+    searchString,
+    onSearchChange: setSearchString,
+    isSearchPending,
+    isSearchFetching,
+    semesters,
+    courses,
+    chapters,
+    selectedSemester,
+    selectedCourse,
+    selectedChapter,
+    onSemesterChange: handleSemesterChange,
+    onCourseChange: handleCourseChange,
+    onChapterChange: handleChapterChange,
+    isFilterOptionsLoading,
+    isFilterOptionsFetching,
+  };
 
   return (
-    <div className="bg-gray-50/50 dark:bg-gray-900 min-h-screen">
+    <div className="bg-gray-50/50 dark:bg-ds-page min-h-screen">
       <div className="container py-6 md:py-8 lg:py-10">
         <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-5 bg-transparent">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+            <h1 className="text-2xl font-bold text-ds-text-primary tracking-tight">
               Study Materials
             </h1>
             <div className="flex items-center gap-3 mt-2">
-              <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-gray-200/50 dark:bg-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-300">
+              <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-ds-surface-secondary text-xs font-semibold text-ds-text-secondary">
                 {totalCount} {totalCount === 1 ? "Result" : "Results"}
               </span>
               {hasActiveFilters && (
@@ -632,12 +716,35 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
               )}
             </button>
 
-            <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="flex bg-ds-surface p-1 rounded-xl shadow-sm border border-ds-border">
               <div className="hidden lg:flex items-center gap-1 border-r border-gray-100 dark:border-gray-700 pr-2 mr-2">
                 <ViewToggle
                   currentIdx={currentIdx}
                   onChange={handleViewChange}
                 />
+              </div>
+
+              <div className="relative flex items-center h-9 px-1 border-r border-gray-100 dark:border-gray-700 pr-2 mr-2">
+                <select
+                  value={selectedMaterialType}
+                  onChange={(e) => setSelectedMaterialType(e.target.value)}
+                  className="appearance-none text-sm font-medium bg-transparent text-gray-700 dark:text-gray-300 pl-3 pr-8 focus:outline-none cursor-pointer min-w-[120px]"
+                  aria-label="Filter by material type"
+                >
+                  <option value="" className="dark:bg-gray-800">
+                    All types
+                  </option>
+                  {MATERIAL_TYPE_OPTIONS.map((opt) => (
+                    <option
+                      key={opt.value}
+                      value={opt.value}
+                      className="dark:bg-gray-800"
+                    >
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <i className="icofont-rounded-down absolute right-3 text-gray-400 pointer-events-none text-sm" />
               </div>
 
               <div className="relative flex items-center h-9 px-1">
@@ -730,18 +837,33 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
                 </button>
               </span>
             )}
+
+            {selectedMaterialType && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm text-xs text-gray-700 dark:text-gray-300">
+                <span className="font-semibold text-primaryColor">Type</span>
+                {MATERIAL_TYPE_OPTIONS.find((o) => o.value === selectedMaterialType)
+                  ?.label || selectedMaterialType}
+                <button
+                  type="button"
+                  onClick={() => setSelectedMaterialType("")}
+                  className="ml-1 text-gray-400 hover:text-red-500"
+                >
+                  <i className="icofont-close-line text-sm" />
+                </button>
+              </span>
+            )}
           </div>
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto pr-2 custom-scrollbar">
-              <SidebarContent />
+              <MaterialsSidebarFilters {...sidebarProps} />
             </div>
           </aside>
 
           <main className="lg:col-span-9">
-            {isLoading ? (
+            {isInitialLoading ? (
               currentIdx === 0 ? (
                 <GridSkeleton />
               ) : (
@@ -791,8 +913,11 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
               />
             )}
 
-            {isFetching && !isLoading && !isFetchingNextPage && (
-              <div className="mt-4 text-xs text-gray-400">Refreshing...</div>
+            {isSearchFetching && !isInitialLoading && (
+              <div className="mt-4 flex items-center gap-2 text-xs text-gray-400">
+                <span className="w-3 h-3 border-2 border-primaryColor/30 border-t-primaryColor rounded-full animate-spin" />
+                Updating results...
+              </div>
             )}
           </main>
         </div>
@@ -846,7 +971,7 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
               </button>
             </div>
 
-            <SidebarContent mobile />
+            <MaterialsSidebarFilters {...sidebarProps} mobile />
             {hasActiveFilters && (
               <button
                 type="button"

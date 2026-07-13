@@ -190,8 +190,21 @@ const SidebarDashboard = () => {
               path: "/admin/dashboards/admin-academic/courses",
             },
             {
-              name: "Materials",
+              name: "All Materials",
               path: "/admin/dashboards/admin-academic/materials",
+              activeMatch: "materials-root",
+            },
+            {
+              name: "Upload Material",
+              path: "/admin/dashboards/admin-academic/materials/create",
+            },
+            {
+              name: "Access Reports",
+              path: "/admin/dashboards/admin-academic/materials/reports",
+            },
+            {
+              name: "Feedback Inbox",
+              path: "/admin/dashboards/admin-academic/materials/feedback",
             },
           ],
         },

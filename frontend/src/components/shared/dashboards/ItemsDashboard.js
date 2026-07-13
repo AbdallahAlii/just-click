@@ -10,9 +10,23 @@ const ItemDashboard = ({ item }) => {
 
   const hasSubItems = Array.isArray(subItems) && subItems.length > 0;
 
+  const isSubPathActive = (sub) => {
+    if (sub.activeMatch === "materials-root") {
+      if (currentPath === sub.path) return true;
+      if (!currentPath.startsWith(`${sub.path}/`)) return false;
+      const suffix = currentPath.slice(sub.path.length + 1);
+      return (
+        !suffix.startsWith("reports") &&
+        !suffix.startsWith("feedback") &&
+        !suffix.startsWith("create")
+      );
+    }
+    return currentPath === sub.path;
+  };
+
   const isExactActive = currentPath === path;
   const isSubActive = hasSubItems
-    ? subItems.some((sub) => currentPath === sub.path)
+    ? subItems.some((sub) => isSubPathActive(sub))
     : false;
 
   const isActive = isExactActive || isSubActive;
@@ -29,8 +43,8 @@ const ItemDashboard = ({ item }) => {
     "group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-colors";
 
   const itemStateClass = isActive
-    ? "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300"
-    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-slate-800 dark:hover:text-white";
+    ? "bg-primaryColor/10 text-ds-action dark:text-ds-action"
+    : "text-ds-text-secondary hover:bg-ds-surface-hover hover:text-ds-text-primary";
 
   const content = (
     <>
@@ -38,8 +52,8 @@ const ItemDashboard = ({ item }) => {
         <span
           className={`shrink-0 ${
             isActive
-              ? "text-violet-600 dark:text-violet-300"
-              : "text-gray-500 dark:text-gray-400"
+              ? "text-ds-action"
+              : "text-ds-text-muted"
           }`}
         >
           {icon}
@@ -100,16 +114,16 @@ const ItemDashboard = ({ item }) => {
           }`}
         >
           {subItems.map((sub, index) => {
-            const subActive = currentPath === sub.path;
+            const subActive = isSubPathActive(sub);
 
             return (
               <li key={index}>
                 <Link
                   href={sub.path}
-                  className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
+                  className={`block rounded-lg px-3 py-2 text-sm transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-focus ${
                     subActive
-                      ? "text-violet-700 bg-violet-50 font-medium dark:bg-violet-500/10 dark:text-violet-300"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-slate-800"
+                      ? "text-ds-action bg-primaryColor/10 font-medium"
+                      : "text-ds-text-muted hover:text-ds-text-primary hover:bg-ds-surface-hover"
                   }`}
                 >
                   {sub.name}

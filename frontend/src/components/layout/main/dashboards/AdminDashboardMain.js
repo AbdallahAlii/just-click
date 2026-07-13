@@ -9,6 +9,7 @@ import {
   FileText,
   GraduationCap,
   Image as ImageIcon,
+  MessageSquareWarning,
   Presentation,
   ShieldCheck,
   TrendingDown,
@@ -20,6 +21,8 @@ import {
 } from "lucide-react";
 
 import { useAdminDashboardSummary } from "@/features/dashboard/hooks";
+import { useMaterialFeedbackAdminSummary } from "@/features/materials/hooks";
+import Link from "next/link";
 
 const Card = ({ title, value, change, trend, icon: Icon, meta, metaIcons }) => {
   return (
@@ -201,6 +204,8 @@ const MaterialBreakdown = ({ data }) => {
 
 const AdminDashboardMain = () => {
   const { data: apiResponse, isLoading, isError } = useAdminDashboardSummary();
+  const { data: feedbackSummaryRes } = useMaterialFeedbackAdminSummary();
+  const feedbackSummary = feedbackSummaryRes?.data || {};
 
   if (isLoading) {
     return (
@@ -303,6 +308,85 @@ const AdminDashboardMain = () => {
         </div>
         <div className="lg:col-span-1">
           <MaterialBreakdown data={summary_cards.total_materials.meta} />
+        </div>
+      </div>
+
+      {/* Material feedback moderation */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/60 rounded-3xl overflow-hidden shadow-sm">
+        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800/50 flex flex-wrap justify-between items-center gap-3 bg-slate-50/50 dark:bg-slate-800/20">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Material Feedback Inbox
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              Student comments, questions, and broken-file reports
+            </p>
+          </div>
+          <Link
+            href="/admin/dashboards/admin-academic/materials/feedback"
+            className="text-sm font-semibold text-primaryColor hover:underline"
+          >
+            Open inbox →
+          </Link>
+        </div>
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-5 rounded-2xl border border-amber-100 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 rounded-xl">
+                <MessageSquareWarning className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Open issues
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Needs admin action
+                </p>
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">
+              {feedbackSummary.open_issues ?? 0}
+            </div>
+          </div>
+          <div className="p-5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+                Awaiting reply
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                No admin response yet
+              </p>
+            </div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">
+              {feedbackSummary.awaiting_admin_reply ?? 0}
+            </div>
+          </div>
+          <div className="p-5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+                Broken files
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Open reports
+              </p>
+            </div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">
+              {feedbackSummary.broken_file_open ?? 0}
+            </div>
+          </div>
+          <div className="p-5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
+            <div>
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-white">
+                Comments
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                All time
+              </p>
+            </div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">
+              {feedbackSummary.comments_total ?? 0}
+            </div>
+          </div>
         </div>
       </div>
 

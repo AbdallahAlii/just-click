@@ -14,6 +14,7 @@ import { getFileIcon, getSemesterBg } from "@/utils/fileIcons";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import MaterialAiAssistant from "@/components/chatbot/MaterialAiAssistant";
+import MaterialFeedbackPanel from "@/components/materials/MaterialFeedbackPanel";
 
 const formatFileSize = (sizeMb) => {
   if (sizeMb === null || sizeMb === undefined || Number.isNaN(Number(sizeMb))) {
@@ -218,7 +219,16 @@ const MaterialDetailsPrimary = ({ id }) => {
     if (!numericId || !rawMaterial) return;
     if (hasTrackedViewRef.current) return;
 
+    const sessionKey = `material_view_tracked_${numericId}`;
+    if (typeof window !== "undefined" && sessionStorage.getItem(sessionKey)) {
+      hasTrackedViewRef.current = true;
+      return;
+    }
+
     hasTrackedViewRef.current = true;
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(sessionKey, "1");
+    }
     trackView({ id: numericId, cooldown_seconds: 3600 });
   }, [numericId, rawMaterial, trackView]);
 
@@ -533,6 +543,11 @@ const MaterialDetailsPrimary = ({ id }) => {
                 </div>
               ))}
             </section>
+
+            <MaterialFeedbackPanel
+              materialId={numericId}
+              stats={rawMaterial?.stats || material?.stats}
+            />
           </div>
 
           <div className="lg:col-span-4">

@@ -11,7 +11,7 @@ export default function AppToaster() {
       toastOptions={{
         duration: 5000,
         className:
-          "!text-sm !font-medium !rounded-xl !shadow-lg dark:!bg-gray-800 dark:!text-white",
+          "!text-sm !font-medium !rounded-xl !shadow-lg !bg-ds-surface !text-ds-text-primary !border !border-ds-border",
         success: {
           iconTheme: {
             primary: "#22c55e",

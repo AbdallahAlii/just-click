@@ -48,7 +48,7 @@ const DashboardContainer = ({ children }) => {
         <div className="flex items-center pt-4 pb-4">
           <button
             onClick={toggleSidebar}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primaryColor dark:border-slate-700 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700 dark:hover:text-white"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primaryColor dark:border-ds-border dark:bg-ds-surface dark:text-ds-text-secondary dark:hover:bg-ds-surface-hover dark:hover:text-ds-text-primary"
             title={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
             aria-label={isSidebarOpen ? "Close Sidebar" : "Open Sidebar"}
           >
@@ -87,15 +87,15 @@ const DashboardContainer = ({ children }) => {
                   isSidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
               >
-                <div className="flex h-full flex-col bg-white dark:bg-slate-900 shadow-2xl">
-                  <div className="flex items-center justify-between border-b border-gray-200/80 px-5 py-4 dark:border-slate-800">
-                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                <div className="flex h-full flex-col bg-white dark:bg-ds-surface shadow-2xl">
+                  <div className="flex items-center justify-between border-b border-gray-200/80 px-5 py-4 dark:border-ds-border">
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-ds-text-primary">
                       Dashboard Menu
                     </h2>
 
                     <button
                       onClick={closeSidebar}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:border-slate-700 dark:text-gray-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:border-ds-border dark:text-ds-text-muted dark:hover:bg-ds-surface-hover dark:hover:text-ds-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-focus"
                       aria-label="Close sidebar"
                     >
                       <svg
@@ -131,7 +131,7 @@ const DashboardContainer = ({ children }) => {
             >
               {isSidebarOpen && (
                 <aside className="hidden lg:block lg:col-span-3 xl:col-span-3 2xl:col-span-2">
-                  <div className="sticky top-6 overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div className="sticky top-6 overflow-hidden rounded-3xl border border-gray-200/80 bg-white shadow-sm dark:border-ds-border dark:bg-ds-surface">
                     <div className="h-[calc(100vh-110px)] min-h-[620px]">
                       <SidebarDashboard />
                     </div>
