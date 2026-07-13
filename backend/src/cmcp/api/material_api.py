@@ -14,6 +14,11 @@ from cmcp.config.database import db
 from cmcp.core.exceptions import BusinessValidationError, NotFoundError
 from cmcp.modules.materials.constants import MAX_MATERIALS_PER_REQUEST
 from cmcp.modules.materials.schemas import MaterialCreateIn, MaterialUpdateIn, MaterialFavoriteIn, _BaseIn
+from cmcp.modules.materials.feedback_schemas import (
+    MaterialFeedbackCreateIn,
+    MaterialFeedbackReplyIn,
+    MaterialFeedbackResolveIn,
+)
 from cmcp.modules.materials.service import MaterialsService
 from cmcp.security.rbac_guards import require_company_and_permission
 
@@ -65,6 +70,36 @@ def _json_body() -> Dict[str, Any]:
     if not isinstance(payload, dict):
         raise BusinessValidationError("Request body must be a JSON object.")
     return payload
+
+
+def _parse_optional_datetime(value: Optional[str]):
+    if not value:
+        return None
+    from datetime import datetime
+
+    text = str(value).strip()
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _parse_student_list_filters(q) -> Dict[str, Any]:
+    return {
+        "course_offering_id": q.get("course_offering_id", type=int),
+        "chapter_id": q.get("chapter_id", type=int),
+        "semester_id": q.get("semester_id", type=int),
+        "academic_year_id": q.get("academic_year_id", type=int),
+        "course_id": q.get("course_id", type=int),
+        "department_id": q.get("department_id", type=int),
+        "faculty_id": q.get("faculty_id", type=int),
+        "material_type": (q.get("material_type") or "").strip() or None,
+        "search": (q.get("search") or "").strip() or None,
+        "is_favorite": q.get("is_favorite", type=bool),
+        "sort_by": (q.get("sort_by") or "").strip() or None,
+        "uploaded_from": _parse_optional_datetime(q.get("uploaded_from")),
+        "uploaded_to": _parse_optional_datetime(q.get("uploaded_to")),
+    }
 def _clean_pydantic_error(e: ValidationError) -> str:
     errors = e.errors() or []
     if not errors:
@@ -382,15 +417,7 @@ def list_materials(company_id: int):
         mode = (q.get("mode") or "cursor").strip().lower()
         external_base = _external_base()
 
-        filters: Dict[str, Any] = {
-            "course_offering_id": q.get("course_offering_id", type=int),
-            "chapter_id": q.get("chapter_id", type=int),
-            "semester_id": q.get("semester_id", type=int),
-            "academic_year_id": q.get("academic_year_id", type=int),
-            "material_type": (q.get("material_type") or "").strip() or None,
-            "search": (q.get("search") or "").strip() or None,
-            "is_favorite": q.get("is_favorite", type=bool),
-        }
+        filters: Dict[str, Any] = _parse_student_list_filters(q)
 
         # Parse is_enabled
         is_enabled_raw = q.get("is_enabled", "true")
@@ -663,5 +690,132 @@ def list_my_favorites(company_id: int):
         )
         return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=400)
 
+    except Exception as e:
+        return _handle_error(e)
+
+
+# =============================================================================
+# FEEDBACK
+# =============================================================================
+
+@bp.post("/<int:material_id>/feedback")
+@require_company_and_permission(doctype="Material", action="READ")
+def submit_material_feedback(company_id: int, material_id: int):
+    try:
+        payload = MaterialFeedbackCreateIn.model_validate(_json_body())
+        ok, msg, out = svc.submit_feedback(
+            company_id=company_id,
+            material_id=material_id,
+            feedback_type=payload.feedback_type,
+            rating=payload.rating,
+            message=payload.message,
+        )
+        _commit_ok(ok)
+        status = 201 if ok else 400
+        return api_success(message=msg, data=out, status_code=status) if ok else api_error(msg, status_code=status)
+    except ValidationError as e:
+        return api_error(_clean_pydantic_error(e), status_code=400)
+    except Exception as e:
+        return _handle_error(e)
+
+
+@bp.get("/<int:material_id>/feedback")
+@require_company_and_permission(doctype="Material", action="READ")
+def list_material_feedback(company_id: int, material_id: int):
+    try:
+        limit = request.args.get("limit", type=int) or 50
+        ok, msg, out = svc.list_material_feedback(
+            company_id=company_id,
+            material_id=material_id,
+            limit=limit,
+        )
+        return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=404)
+    except Exception as e:
+        return _handle_error(e)
+
+
+@bp.get("/feedback/admin")
+@require_company_and_permission(doctype="Material", action="READ", admin_only=True)
+def list_material_feedback_admin(company_id: int):
+    try:
+        q = request.args
+        ok, msg, out = svc.list_feedback_admin(
+            company_id=company_id,
+            status=(q.get("status") or "").strip() or None,
+            feedback_type=(q.get("feedback_type") or "").strip() or None,
+            material_id=q.get("material_id", type=int),
+            page=q.get("page", type=int) or 1,
+            per_page=q.get("limit", type=int) or 20,
+        )
+        return api_success(message=msg, data=out, status_code=200)
+    except Exception as e:
+        return _handle_error(e)
+
+
+@bp.post("/feedback/<int:feedback_id>/reply")
+@require_company_and_permission(doctype="Material", action="UPDATE", admin_only=True)
+def reply_material_feedback(company_id: int, feedback_id: int):
+    try:
+        from cmcp.modules.auth.deps import get_current_user
+
+        admin = get_current_user()
+        payload = MaterialFeedbackReplyIn.model_validate(_json_body())
+        ok, msg, out = svc.reply_feedback(
+            company_id=company_id,
+            feedback_id=feedback_id,
+            admin_user_id=int(admin["user_id"]),
+            admin_reply=payload.admin_reply,
+        )
+        _commit_ok(ok)
+        return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=404)
+    except ValidationError as e:
+        return api_error(_clean_pydantic_error(e), status_code=400)
+    except Exception as e:
+        return _handle_error(e)
+
+
+@bp.post("/feedback/<int:feedback_id>/resolve")
+@require_company_and_permission(doctype="Material", action="UPDATE", admin_only=True)
+def resolve_material_feedback(company_id: int, feedback_id: int):
+    try:
+        from cmcp.modules.auth.deps import get_current_user
+
+        admin = get_current_user()
+        payload = MaterialFeedbackResolveIn.model_validate(_json_body() or {})
+        ok, msg, out = svc.resolve_feedback(
+            company_id=company_id,
+            feedback_id=feedback_id,
+            admin_user_id=int(admin["user_id"]),
+            admin_reply=payload.admin_reply,
+        )
+        _commit_ok(ok)
+        return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=404)
+    except ValidationError as e:
+        return api_error(_clean_pydantic_error(e), status_code=400)
+    except Exception as e:
+        return _handle_error(e)
+
+
+# =============================================================================
+# ACCESS REPORTS
+# =============================================================================
+
+@bp.get("/feedback/admin/summary")
+@require_company_and_permission(doctype="Material", action="READ", admin_only=True)
+def material_feedback_admin_summary(company_id: int):
+    try:
+        ok, msg, out = svc.get_feedback_admin_summary(company_id=company_id)
+        return api_success(message=msg, data=out, status_code=200)
+    except Exception as e:
+        return _handle_error(e)
+
+
+@bp.get("/reports/access")
+@require_company_and_permission(doctype="Material", action="READ", admin_only=True)
+def material_access_reports(company_id: int):
+    try:
+        limit = request.args.get("limit", type=int) or 10
+        ok, msg, out = svc.get_access_reports(company_id=company_id, limit=limit)
+        return api_success(message=msg, data=out, status_code=200)
     except Exception as e:
         return _handle_error(e)

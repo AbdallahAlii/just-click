@@ -1435,3 +1435,177 @@ class MaterialsService:
         except Exception as exc:
             log.exception("[materials.list_favorites]")
             return False, f"Failed to load favorites: {exc}", {}
+
+    # -------------------------------------------------------------------------
+    # FEEDBACK
+    # -------------------------------------------------------------------------
+
+    def submit_feedback(
+        self,
+        *,
+        company_id: int,
+        material_id: int,
+        feedback_type: str,
+        rating: Optional[int] = None,
+        message: Optional[str] = None,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        uid = self.repo._current_user_id()
+        if not uid:
+            return False, "Authentication required.", {}
+
+        if not self.repo.material_exists_in_scope(
+            company_id=company_id,
+            material_id=material_id,
+        ):
+            return False, "Material not found.", {}
+
+        try:
+            with self.s.begin_nested():
+                if feedback_type == "rating":
+                    row = self.repo.upsert_rating(
+                        company_id=company_id,
+                        material_id=material_id,
+                        user_id=int(uid),
+                        rating=int(rating or 0),
+                    )
+                else:
+                    row = self.repo.create_feedback(
+                        company_id=company_id,
+                        material_id=material_id,
+                        user_id=int(uid),
+                        feedback_type=feedback_type,
+                        rating=rating,
+                        message=message,
+                    )
+
+            mat = self.s.get(Material, int(material_id))
+            return True, "Feedback submitted.", {
+                "feedback": self.repo._shape_feedback_row(row, None, None),
+                "material_stats": {
+                    "rating_count": int(mat.rating_count or 0) if mat else 0,
+                    "rating_avg": round(float(mat.rating_avg or 0), 2) if mat else 0.0,
+                },
+            }
+        except Exception as exc:
+            log.exception("[materials.submit_feedback] material_id=%s", material_id)
+            return False, "Failed to submit feedback.", {}
+
+    def list_material_feedback(
+        self,
+        *,
+        company_id: int,
+        material_id: int,
+        limit: int = 50,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        if not self.repo.material_exists_in_scope(
+            company_id=company_id,
+            material_id=material_id,
+        ):
+            return False, "Material not found.", {}
+
+        uid = self.repo._current_user_id()
+        rows = self.repo.list_material_feedback(
+            company_id=company_id,
+            material_id=material_id,
+            viewer_user_id=int(uid) if uid else None,
+            include_ratings=False,
+            limit=limit,
+        )
+
+        user_rating = None
+        if uid:
+            rating_row = self.repo.get_user_rating(
+                company_id=company_id,
+                material_id=material_id,
+                user_id=int(uid),
+            )
+            if rating_row:
+                user_rating = int(rating_row.rating)
+
+        return True, "OK", {
+            "items": rows,
+            "user_rating": user_rating,
+        }
+
+    def list_feedback_admin(
+        self,
+        *,
+        company_id: int,
+        status: Optional[str] = None,
+        feedback_type: Optional[str] = None,
+        material_id: Optional[int] = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        rows, total, pages = self.repo.list_feedback_admin(
+            company_id=company_id,
+            status=status,
+            feedback_type=feedback_type,
+            material_id=material_id,
+            page=page,
+            per_page=per_page,
+        )
+        return True, "OK", {
+            "data": rows,
+            "pagination": {
+                "page": int(page),
+                "limit": int(per_page),
+                "total": int(total),
+                "pages": int(pages),
+            },
+        }
+
+    def reply_feedback(
+        self,
+        *,
+        company_id: int,
+        feedback_id: int,
+        admin_user_id: int,
+        admin_reply: str,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        row = self.repo.reply_to_feedback(
+            company_id=company_id,
+            feedback_id=feedback_id,
+            admin_user_id=admin_user_id,
+            admin_reply=admin_reply,
+        )
+        if not row:
+            return False, "Feedback not found.", {}
+        return True, "Reply saved.", {
+            "feedback": self.repo._shape_feedback_row(row, None, None),
+        }
+
+    def resolve_feedback(
+        self,
+        *,
+        company_id: int,
+        feedback_id: int,
+        admin_user_id: int,
+        admin_reply: Optional[str] = None,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        row = self.repo.resolve_feedback(
+            company_id=company_id,
+            feedback_id=feedback_id,
+            admin_user_id=admin_user_id,
+            admin_reply=admin_reply,
+        )
+        if not row:
+            return False, "Feedback not found.", {}
+        return True, "Feedback resolved.", {
+            "feedback": self.repo._shape_feedback_row(row, None, None),
+        }
+
+    def get_access_reports(
+        self,
+        *,
+        company_id: int,
+        limit: int = 10,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        return True, "OK", self.repo.get_access_reports(company_id=company_id, limit=limit)
+
+    def get_feedback_admin_summary(
+        self,
+        *,
+        company_id: int,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        return True, "OK", self.repo.get_feedback_admin_summary(company_id=company_id)

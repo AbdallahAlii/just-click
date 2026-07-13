@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, selectinload
 from cmcp.config.database import db
 from cmcp.core.base_repo import BaseRepository
-from cmcp.modules.materials.models import Material, StudentMaterialInteraction
+from cmcp.modules.materials.models import Material, StudentMaterialInteraction, MaterialFeedback, MaterialFeedbackTypeEnum, MaterialFeedbackStatusEnum
 from cmcp.modules.academic.models import (
     Course,
     CourseOffering,  # NEW
@@ -90,6 +90,8 @@ class MaterialListRow:
     # Sort helpers
     sort_semester_number: Optional[int] = None
     sort_semester_priority: Optional[int] = None
+    rating_count: int = 0
+    rating_avg: float = 0.0
 
 
 @dataclass
@@ -362,6 +364,21 @@ class MaterialsRepo:
         if filters.get("academic_year_id"):
             stmt = stmt.where(Semester.academic_year_id == int(filters["academic_year_id"]))
 
+        if filters.get("course_id"):
+            stmt = stmt.where(Course.id == int(filters["course_id"]))
+
+        if filters.get("department_id"):
+            stmt = stmt.where(Department.id == int(filters["department_id"]))
+
+        if filters.get("faculty_id"):
+            stmt = stmt.where(Faculty.id == int(filters["faculty_id"]))
+
+        if filters.get("uploaded_from"):
+            stmt = stmt.where(Material.created_at >= filters["uploaded_from"])
+
+        if filters.get("uploaded_to"):
+            stmt = stmt.where(Material.created_at <= filters["uploaded_to"])
+
         # Search in title, description, course title, chapter title
         search = (filters.get("search") or "").strip()
         if search:
@@ -533,10 +550,34 @@ class MaterialsRepo:
         # Don't use priority if user explicitly filtered
         if any(filters.get(k) for k in ("semester_id", "course_id", "chapter_id")):
             return False
+        if self._resolve_sort_by(filters) != "recent":
+            return False
         return True
 
 
+    def _resolve_sort_by(self, filters: Dict[str, Any]) -> str:
+        raw = (filters.get("sort_by") or "recent").strip().lower()
+        allowed = {
+            "recent",
+            "most_viewed",
+            "most_downloaded",
+            "highest_rated",
+            "alphabetical",
+        }
+        return raw if raw in allowed else "recent"
+
     def _apply_ordering(self, stmt, *, scope: Dict[str, Any], filters: Dict[str, Any]):
+        sort_by = self._resolve_sort_by(filters)
+
+        if sort_by == "most_viewed":
+            return stmt.order_by(Material.view_count.desc(), Material.id.desc())
+        if sort_by == "most_downloaded":
+            return stmt.order_by(Material.download_count.desc(), Material.id.desc())
+        if sort_by == "highest_rated":
+            return stmt.order_by(Material.rating_avg.desc(), Material.rating_count.desc(), Material.id.desc())
+        if sort_by == "alphabetical":
+            return stmt.order_by(Material.title.asc(), Material.id.asc())
+
         if self._use_semester_priority(scope=scope, filters=filters):
             prio = self._semester_priority_expr(scope["semester_number"])
             return stmt.order_by(
@@ -630,6 +671,8 @@ class MaterialsRepo:
                 Material.updated_at,
                 func.coalesce(Material.view_count, 0).label("view_count"),
                 func.coalesce(Material.download_count, 0).label("download_count"),
+                func.coalesce(Material.rating_count, 0).label("rating_count"),
+                func.coalesce(Material.rating_avg, 0).label("rating_avg"),
                 Course.id.label("course_id"),
                 Course.title.label("course_title"),
                 Course.code.label("course_code"),
@@ -828,8 +871,8 @@ class MaterialsRepo:
         scope = self._current_user_scope(company_id=company_id)
 
         base = self._base_stmt(company_id=company_id, filters=filters, is_enabled=is_enabled)
+        base = self._apply_ordering(base, scope=scope, filters=filters)
 
-        # Count total
         total = int(self.s.scalar(select(func.count()).select_from(base.order_by(None).subquery())) or 0)
         pages = max((total + per_page - 1) // per_page, 1)
         page = min(max(page, 1), pages)
@@ -975,6 +1018,8 @@ class MaterialsRepo:
             "stats": {
                 "view_count": int(r.view_count or 0),
                 "download_count": int(r.download_count or 0),
+                "rating_count": int(getattr(r, "rating_count", 0) or 0),
+                "rating_avg": round(float(getattr(r, "rating_avg", 0) or 0), 2),
             },
             "context": {
                 "academic_year": {"id": int(r.academic_year_id), "name": r.academic_year_name} if r.academic_year_id else None,
@@ -1051,6 +1096,8 @@ class MaterialsRepo:
             "stats": {
                 "view_count": int(r.view_count or 0),
                 "download_count": int(r.download_count or 0),
+                "rating_count": int(getattr(r, "rating_count", 0) or 0),
+                "rating_avg": round(float(getattr(r, "rating_avg", 0) or 0), 2),
             },
             "file": {
                 "url": r.file_url,
@@ -1987,3 +2034,512 @@ class MaterialsRepo:
             return "This material belongs to another faculty. You can only access materials assigned to your faculty."
 
         return "This material is not available for your academic profile."
+
+    # -------------------------------------------------------------------------
+    # FEEDBACK
+    # -------------------------------------------------------------------------
+
+    def material_exists_in_scope(self, *, company_id: int, material_id: int) -> bool:
+        row = self.get_material_detail(company_id=company_id, material_id=material_id)
+        return row is not None
+
+    def get_user_rating(self, *, company_id: int, material_id: int, user_id: int) -> Optional[MaterialFeedback]:
+        return (
+            self.s.query(MaterialFeedback)
+            .filter(
+                MaterialFeedback.company_id == int(company_id),
+                MaterialFeedback.material_id == int(material_id),
+                MaterialFeedback.user_id == int(user_id),
+                MaterialFeedback.feedback_type == MaterialFeedbackTypeEnum.RATING,
+            )
+            .first()
+        )
+
+    def upsert_rating(
+        self,
+        *,
+        company_id: int,
+        material_id: int,
+        user_id: int,
+        rating: int,
+    ) -> MaterialFeedback:
+        existing = self.get_user_rating(
+            company_id=company_id,
+            material_id=material_id,
+            user_id=user_id,
+        )
+        old_rating = int(existing.rating) if existing else None
+
+        if existing:
+            existing.rating = int(rating)
+            row = existing
+        else:
+            row = MaterialFeedback(
+                company_id=int(company_id),
+                material_id=int(material_id),
+                user_id=int(user_id),
+                feedback_type=MaterialFeedbackTypeEnum.RATING,
+                rating=int(rating),
+            )
+            self.s.add(row)
+
+        self.s.flush()
+        self._refresh_material_rating_stats(
+            company_id=company_id,
+            material_id=material_id,
+            old_rating=old_rating,
+            new_rating=int(rating),
+            is_new=existing is None,
+        )
+        return row
+
+    def _refresh_material_rating_stats(
+        self,
+        *,
+        company_id: int,
+        material_id: int,
+        old_rating: Optional[int],
+        new_rating: int,
+        is_new: bool,
+    ) -> None:
+        mat = (
+            self.s.query(Material)
+            .filter(
+                Material.company_id == int(company_id),
+                Material.id == int(material_id),
+            )
+            .with_for_update()
+            .first()
+        )
+        if not mat:
+            return
+
+        total = int(mat.rating_count or 0)
+        avg = float(mat.rating_avg or 0.0)
+        total_score = avg * total
+
+        if is_new:
+            total += 1
+            total_score += int(new_rating)
+        elif old_rating is not None:
+            total_score += int(new_rating) - int(old_rating)
+
+        mat.rating_count = total
+        mat.rating_avg = round(total_score / total, 2) if total > 0 else 0.0
+
+    def create_feedback(
+        self,
+        *,
+        company_id: int,
+        material_id: int,
+        user_id: int,
+        feedback_type: str,
+        rating: Optional[int] = None,
+        message: Optional[str] = None,
+    ) -> MaterialFeedback:
+        ftype = MaterialFeedbackTypeEnum(feedback_type)
+        status = None
+        if ftype in {MaterialFeedbackTypeEnum.BROKEN_FILE, MaterialFeedbackTypeEnum.CLARIFICATION}:
+            status = MaterialFeedbackStatusEnum.OPEN
+
+        row = MaterialFeedback(
+            company_id=int(company_id),
+            material_id=int(material_id),
+            user_id=int(user_id),
+            feedback_type=ftype,
+            rating=int(rating) if rating is not None else None,
+            message=message,
+            status=status,
+        )
+        self.s.add(row)
+        self.s.flush()
+        return row
+
+    def list_material_feedback(
+        self,
+        *,
+        company_id: int,
+        material_id: int,
+        viewer_user_id: Optional[int] = None,
+        include_ratings: bool = False,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        from cmcp.modules.auth.models import User
+        from cmcp.modules.education_people.models import StudentProfile
+
+        public_types = [
+            MaterialFeedbackTypeEnum.COMMENT,
+            MaterialFeedbackTypeEnum.CLARIFICATION,
+        ]
+
+        visibility = MaterialFeedback.feedback_type.in_(public_types)
+        if viewer_user_id:
+            visibility = sa_or(
+                visibility,
+                and_(
+                    MaterialFeedback.feedback_type == MaterialFeedbackTypeEnum.BROKEN_FILE,
+                    MaterialFeedback.user_id == int(viewer_user_id),
+                ),
+            )
+
+        q = (
+            self.s.query(
+                MaterialFeedback,
+                User.username,
+                StudentProfile.full_name,
+            )
+            .join(User, User.id == MaterialFeedback.user_id)
+            .outerjoin(
+                StudentProfile,
+                and_(
+                    StudentProfile.user_id == MaterialFeedback.user_id,
+                    StudentProfile.company_id == MaterialFeedback.company_id,
+                ),
+            )
+            .filter(
+                MaterialFeedback.company_id == int(company_id),
+                MaterialFeedback.material_id == int(material_id),
+                visibility,
+            )
+        )
+
+        if not include_ratings:
+            q = q.filter(
+                MaterialFeedback.feedback_type != MaterialFeedbackTypeEnum.RATING
+            )
+
+        rows = (
+            q.order_by(MaterialFeedback.created_at.desc())
+            .limit(max(1, min(int(limit), 200)))
+            .all()
+        )
+        return [self._shape_feedback_row(row[0], row[1], row[2]) for row in rows]
+
+    def get_feedback_admin_summary(self, *, company_id: int) -> Dict[str, Any]:
+        base = self.s.query(MaterialFeedback).filter(
+            MaterialFeedback.company_id == int(company_id),
+        )
+
+        open_issues = int(
+            base.filter(MaterialFeedback.status == MaterialFeedbackStatusEnum.OPEN).count()
+        )
+        broken_open = int(
+            base.filter(
+                MaterialFeedback.feedback_type == MaterialFeedbackTypeEnum.BROKEN_FILE,
+                MaterialFeedback.status == MaterialFeedbackStatusEnum.OPEN,
+            ).count()
+        )
+        clarification_open = int(
+            base.filter(
+                MaterialFeedback.feedback_type == MaterialFeedbackTypeEnum.CLARIFICATION,
+                MaterialFeedback.status == MaterialFeedbackStatusEnum.OPEN,
+            ).count()
+        )
+        comments_total = int(
+            base.filter(
+                MaterialFeedback.feedback_type == MaterialFeedbackTypeEnum.COMMENT,
+            ).count()
+        )
+        awaiting_reply = int(
+            base.filter(
+                MaterialFeedback.feedback_type.in_(
+                    [
+                        MaterialFeedbackTypeEnum.COMMENT,
+                        MaterialFeedbackTypeEnum.CLARIFICATION,
+                        MaterialFeedbackTypeEnum.BROKEN_FILE,
+                    ]
+                ),
+                MaterialFeedback.admin_reply.is_(None),
+                MaterialFeedback.message.isnot(None),
+            ).count()
+        )
+
+        return {
+            "open_issues": open_issues,
+            "broken_file_open": broken_open,
+            "clarification_open": clarification_open,
+            "comments_total": comments_total,
+            "awaiting_admin_reply": awaiting_reply,
+        }
+
+    def list_feedback_admin(
+        self,
+        *,
+        company_id: int,
+        status: Optional[str] = None,
+        feedback_type: Optional[str] = None,
+        material_id: Optional[int] = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> Tuple[List[Dict[str, Any]], int, int]:
+        from cmcp.modules.auth.models import User
+        from cmcp.modules.education_people.models import StudentProfile
+
+        base = (
+            self.s.query(MaterialFeedback)
+            .filter(MaterialFeedback.company_id == int(company_id))
+        )
+
+        if status:
+            base = base.filter(MaterialFeedback.status == MaterialFeedbackStatusEnum(status))
+        if feedback_type:
+            base = base.filter(MaterialFeedback.feedback_type == MaterialFeedbackTypeEnum(feedback_type))
+        if material_id:
+            base = base.filter(MaterialFeedback.material_id == int(material_id))
+
+        total = int(base.count())
+        pages = max((total + per_page - 1) // per_page, 1)
+        page = min(max(page, 1), pages)
+        offset = (page - 1) * per_page
+
+        rows = (
+            base.order_by(MaterialFeedback.created_at.desc())
+            .offset(offset)
+            .limit(per_page)
+            .all()
+        )
+
+        out = []
+        for fb in rows:
+            user = self.s.get(User, int(fb.user_id))
+            prof = (
+                self.s.query(StudentProfile.full_name)
+                .filter(
+                    StudentProfile.company_id == int(company_id),
+                    StudentProfile.user_id == int(fb.user_id),
+                )
+                .first()
+            )
+            item = self._shape_feedback_row(fb, user.username if user else None, prof[0] if prof else None)
+            mat = self.s.get(Material, int(fb.material_id))
+            item["material"] = {"id": int(fb.material_id), "title": mat.title if mat else None}
+            out.append(item)
+
+        return out, total, pages
+
+    def reply_to_feedback(
+        self,
+        *,
+        company_id: int,
+        feedback_id: int,
+        admin_user_id: int,
+        admin_reply: str,
+    ) -> Optional[MaterialFeedback]:
+        row = (
+            self.s.query(MaterialFeedback)
+            .filter(
+                MaterialFeedback.company_id == int(company_id),
+                MaterialFeedback.id == int(feedback_id),
+            )
+            .first()
+        )
+        if not row:
+            return None
+        row.admin_reply = admin_reply.strip()
+        self.s.flush()
+        return row
+
+    def resolve_feedback(
+        self,
+        *,
+        company_id: int,
+        feedback_id: int,
+        admin_user_id: int,
+        admin_reply: Optional[str] = None,
+    ) -> Optional[MaterialFeedback]:
+        row = (
+            self.s.query(MaterialFeedback)
+            .filter(
+                MaterialFeedback.company_id == int(company_id),
+                MaterialFeedback.id == int(feedback_id),
+            )
+            .first()
+        )
+        if not row:
+            return None
+        if admin_reply:
+            row.admin_reply = admin_reply.strip()
+        row.status = MaterialFeedbackStatusEnum.RESOLVED
+        row.resolved_at = datetime.now(timezone.utc)
+        row.resolved_by_user_id = int(admin_user_id)
+        self.s.flush()
+        return row
+
+    def _shape_feedback_row(
+        self,
+        row: MaterialFeedback,
+        username: Optional[str],
+        full_name: Optional[str],
+    ) -> Dict[str, Any]:
+        return {
+            "id": int(row.id),
+            "material_id": int(row.material_id),
+            "user_id": int(row.user_id),
+            "user": {
+                "username": username,
+                "full_name": full_name,
+            },
+            "feedback_type": row.feedback_type.value,
+            "rating": int(row.rating) if row.rating is not None else None,
+            "message": row.message,
+            "status": row.status.value if row.status else None,
+            "admin_reply": row.admin_reply,
+            "resolved_at": row.resolved_at.isoformat() if row.resolved_at else None,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        }
+
+    # -------------------------------------------------------------------------
+    # ACCESS REPORTS
+    # -------------------------------------------------------------------------
+
+    def _admin_materials_scope_stmt(self, *, company_id: int):
+        scope = self._current_user_scope(company_id=company_id)
+        stmt = (
+            select(
+                Material.id.label("material_id"),
+                Material.title,
+                Material.view_count,
+                Material.download_count,
+                Material.rating_avg,
+                Material.rating_count,
+                Material.created_at,
+                Course.id.label("course_id"),
+                Course.title.label("course_title"),
+                Course.code.label("course_code"),
+                Department.id.label("department_id"),
+                Department.name.label("department_name"),
+            )
+            .select_from(Material)
+        )
+        stmt = self._add_standard_joins(stmt, company_id=company_id)
+        stmt = stmt.where(Material.company_id == int(company_id), Material.is_enabled.is_(True))
+        stmt = self._apply_scope(stmt, scope)
+        return stmt
+
+    def get_access_reports(self, *, company_id: int, limit: int = 10) -> Dict[str, Any]:
+        limit = max(1, min(int(limit), 50))
+        base_sq = self._admin_materials_scope_stmt(company_id=company_id).subquery()
+
+        totals = self.s.execute(
+            select(
+                func.coalesce(func.sum(base_sq.c.view_count), 0),
+                func.coalesce(func.sum(base_sq.c.download_count), 0),
+                func.count(base_sq.c.material_id),
+            ).select_from(base_sq)
+        ).first()
+
+        total_views = int(totals[0] or 0)
+        total_downloads = int(totals[1] or 0)
+        material_count = int(totals[2] or 0)
+
+        zero_access = int(
+            self.s.scalar(
+                select(func.count()).select_from(base_sq).where(
+                    base_sq.c.view_count == 0,
+                    base_sq.c.download_count == 0,
+                )
+            )
+            or 0
+        )
+
+        engaged_students = int(
+            self.s.scalar(
+                select(func.count(func.distinct(StudentMaterialInteraction.user_id))).where(
+                    StudentMaterialInteraction.company_id == int(company_id),
+                    or_(
+                        StudentMaterialInteraction.view_count > 0,
+                        StudentMaterialInteraction.download_count > 0,
+                    ),
+                )
+            )
+            or 0
+        )
+
+        top_viewed = self.s.execute(
+            select(base_sq)
+            .where(base_sq.c.view_count > 0)
+            .order_by(base_sq.c.view_count.desc(), base_sq.c.material_id.desc())
+            .limit(limit)
+        ).all()
+
+        top_downloaded = self.s.execute(
+            select(base_sq)
+            .where(base_sq.c.download_count > 0)
+            .order_by(base_sq.c.download_count.desc(), base_sq.c.material_id.desc())
+            .limit(limit)
+        ).all()
+
+        least_limit = min(limit, 5)
+        least_accessed = self.s.execute(
+            select(base_sq)
+            .order_by(
+                (base_sq.c.view_count + base_sq.c.download_count).asc(),
+                base_sq.c.material_id.asc(),
+            )
+            .limit(least_limit)
+        ).all()
+
+        course_views = func.coalesce(func.sum(base_sq.c.view_count), 0)
+        course_downloads = func.coalesce(func.sum(base_sq.c.download_count), 0)
+        engagement_score = course_views + course_downloads
+
+        top_courses = self.s.execute(
+            select(
+                base_sq.c.course_id,
+                base_sq.c.course_title,
+                base_sq.c.course_code,
+                course_views.label("views"),
+                course_downloads.label("downloads"),
+                engagement_score.label("engagement_score"),
+                func.count(base_sq.c.material_id).label("material_count"),
+            )
+            .group_by(base_sq.c.course_id, base_sq.c.course_title, base_sq.c.course_code)
+            .having(engagement_score > 0)
+            .order_by(engagement_score.desc())
+            .limit(limit)
+        ).all()
+
+        def _row_dict(r):
+            return {
+                "material_id": int(r.material_id),
+                "title": r.title,
+                "view_count": int(r.view_count or 0),
+                "download_count": int(r.download_count or 0),
+                "rating_avg": round(float(r.rating_avg or 0), 2),
+                "rating_count": int(r.rating_count or 0),
+                "course": {
+                    "id": int(r.course_id),
+                    "title": r.course_title,
+                    "code": r.course_code,
+                },
+                "department": {
+                    "id": int(r.department_id) if r.department_id else None,
+                    "name": r.department_name,
+                },
+            }
+
+        return {
+            "summary": {
+                "total_materials": material_count,
+                "total_views": total_views,
+                "total_downloads": total_downloads,
+                "materials_without_access": zero_access,
+                "engaged_students": engaged_students,
+            },
+            "top_viewed_materials": [_row_dict(r) for r in top_viewed],
+            "top_downloaded_materials": [_row_dict(r) for r in top_downloaded],
+            "least_accessed_materials": [_row_dict(r) for r in least_accessed],
+            "most_accessed_courses": [
+                {
+                    "course_id": int(r.course_id),
+                    "title": r.course_title,
+                    "code": r.course_code,
+                    "view_count": int(r.views or 0),
+                    "download_count": int(r.downloads or 0),
+                    "engagement_score": int(r.engagement_score or 0),
+                    "material_count": int(r.material_count or 0),
+                }
+                for r in top_courses
+            ],
+        }

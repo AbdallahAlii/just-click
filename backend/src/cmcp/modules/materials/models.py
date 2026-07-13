@@ -21,6 +21,10 @@ class MaterialTypeEnum(str, enum.Enum):
     OTHER = "other"
 
 
+def _enum_values(enum_cls):
+    return [item.value for item in enum_cls]
+
+
 class Material(BaseModel, TenantMixin):
     """
     A learning material (PDF, slides, video, etc.) uploaded by a lecturer.
@@ -106,6 +110,10 @@ class Material(BaseModel, TenantMixin):
     view_count: Mapped[int] = mapped_column(db.Integer, default=0, nullable=False)
     download_count: Mapped[int] = mapped_column(db.Integer, default=0, nullable=False)
 
+    # Aggregate student ratings (updated when ratings are submitted)
+    rating_count: Mapped[int] = mapped_column(db.Integer, default=0, nullable=False)
+    rating_avg: Mapped[float] = mapped_column(db.Float, default=0.0, nullable=False)
+
     # --- Relationships ---
 
     course_offering: Mapped["CourseOffering"] = db.relationship(
@@ -122,6 +130,13 @@ class Material(BaseModel, TenantMixin):
 
     interactions: Mapped[list["StudentMaterialInteraction"]] = db.relationship(
         "StudentMaterialInteraction",
+        back_populates="material",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
+    feedback_entries: Mapped[list["MaterialFeedback"]] = db.relationship(
+        "MaterialFeedback",
         back_populates="material",
         cascade="all, delete-orphan",
         lazy="select",
@@ -194,4 +209,84 @@ class StudentMaterialInteraction(BaseModel, TenantMixin):
         UniqueConstraint("company_id", "user_id", "material_id", name="uq_user_material_interaction"),
         Index("ix_interactions_company_user", "company_id", "user_id"),
         Index("ix_interactions_company_material", "company_id", "material_id"),
+    )
+
+
+class MaterialFeedbackTypeEnum(str, enum.Enum):
+    RATING = "rating"
+    COMMENT = "comment"
+    BROKEN_FILE = "broken_file"
+    CLARIFICATION = "clarification"
+
+
+class MaterialFeedbackStatusEnum(str, enum.Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+
+
+class MaterialFeedback(BaseModel, TenantMixin):
+    """Student feedback on a material: ratings, comments, issue reports."""
+    __tablename__ = "edu_material_feedback"
+
+    material_id: Mapped[int] = mapped_column(
+        db.BigInteger,
+        db.ForeignKey("edu_materials.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        db.BigInteger,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    feedback_type: Mapped[MaterialFeedbackTypeEnum] = mapped_column(
+        db.Enum(
+            MaterialFeedbackTypeEnum,
+            name="edu_material_feedback_type_enum",
+            values_callable=_enum_values,
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    rating: Mapped[Optional[int]] = mapped_column(db.Integer, nullable=True)
+    message: Mapped[Optional[str]] = mapped_column(db.Text, nullable=True)
+
+    status: Mapped[Optional[MaterialFeedbackStatusEnum]] = mapped_column(
+        db.Enum(
+            MaterialFeedbackStatusEnum,
+            name="edu_material_feedback_status_enum",
+            values_callable=_enum_values,
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    admin_reply: Mapped[Optional[str]] = mapped_column(db.Text, nullable=True)
+    resolved_at: Mapped[Optional[db.DateTime]] = mapped_column(db.DateTime(timezone=True), nullable=True)
+    resolved_by_user_id: Mapped[Optional[int]] = mapped_column(
+        db.BigInteger,
+        db.ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    material: Mapped["Material"] = db.relationship("Material", back_populates="feedback_entries", lazy="select")
+
+    __table_args__ = (
+        CheckConstraint(
+            "(rating IS NULL) OR (rating >= 1 AND rating <= 5)",
+            name="ck_material_feedback_rating_range",
+        ),
+        Index(
+            "uq_material_feedback_one_rating",
+            "company_id",
+            "material_id",
+            "user_id",
+            unique=True,
+            postgresql_where=text("feedback_type = 'rating'"),
+        ),
+        Index("ix_material_feedback_company_material", "company_id", "material_id"),
+        Index("ix_material_feedback_company_status", "company_id", "status"),
     )
