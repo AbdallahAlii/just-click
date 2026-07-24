@@ -5,6 +5,7 @@ import FrappeForm from "@/components/shared/forms/FrappeForm";
 import {
   useApproveStudent,
   useResendOutbox,
+  useResetStudentPassword,
   useStudentDetail,
   useUpdateStudent,
 } from "@/features/people/hooks";
@@ -13,10 +14,16 @@ import useNotify from "@/hooks/useNotify";
 import { useMemo, useState, useEffect, useRef } from "react";
 
 const TRACKED_FIELDS = [
+  "full_name",
+  "student_id",
+  "username",
+  "email",
   "department_id",
   "faculty_id",
   "semester_id",
-  "is_enabled"
+  "classroom_id",
+  "profile_enabled",
+  "account_enabled",
 ];
 
 function extractDropdownRows(res) {
@@ -45,12 +52,8 @@ function getVerificationOutboxId(studentData) {
   return (
     studentData?.email_verification_outbox?.id ||
     studentData?.verification_email_outbox?.id ||
+    studentData?.email_outboxes?.verify_email?.id ||
     studentData?.email_outbox?.id ||
-    studentData?.account?.email_verification_outbox_id ||
-    studentData?.account?.verification_outbox_id ||
-    studentData?.email_verification_outbox_id ||
-    studentData?.verification_outbox_id ||
-    studentData?.email_outbox_id ||
     null
   );
 }
@@ -70,7 +73,7 @@ const StudentDetailMain = ({ id }) => {
   const { data: deptsRes, isLoading: isLoadingDepts } = useDepartmentsDropdown({ limit: 20 });
   const { data: facsRes, isLoading: isLoadingFacs } = useFacultiesDropdown({ limit: 20 });
   const { data: semsRes, isLoading: isLoadingSems } = useSemestersDropdown({ limit: 20 });
-  
+
   const departmentOptions = useMemo(() => mapOptions(extractDropdownRows(deptsRes)), [deptsRes]);
   const facultyOptions = useMemo(() => mapOptions(extractDropdownRows(facsRes)), [facsRes]);
   const semesterOptions = useMemo(() => mapOptions(extractDropdownRows(semsRes)), [semsRes]);
@@ -78,6 +81,7 @@ const StudentDetailMain = ({ id }) => {
   const updateMutation = useUpdateStudent();
   const approveMutation = useApproveStudent();
   const resendVerificationMutation = useResendOutbox();
+  const resetPasswordMutation = useResetStudentPassword();
 
   useEffect(() => {
     if (!studentData) return;
@@ -87,9 +91,12 @@ const StudentDetailMain = ({ id }) => {
       student_id: studentData.profile?.student_id || "",
       username: studentData.user?.username || "",
       email: studentData.user?.email || "",
-      classroom: studentData.context?.classroom?.name || "",
-      status: studentData.user?.status || "",
-      is_enabled: Boolean(studentData.flags?.is_enabled),
+      manual_password: "",
+      classroom_id: studentData.context?.classroom?.id ? String(studentData.context.classroom.id) : "",
+      status_label: studentData.flags?.status_label || "",
+      approval_status: studentData.flags?.approval_status || studentData.user?.status || "",
+      profile_enabled: Boolean(studentData.flags?.profile_enabled ?? studentData.profile?.is_enabled),
+      account_enabled: Boolean(studentData.flags?.account_enabled ?? studentData.user?.is_enabled),
       department_id: studentData.context?.department?.id ? String(studentData.context.department.id) : "",
       faculty_id: studentData.context?.faculty?.id ? String(studentData.context.faculty.id) : "",
       semester_id: studentData.context?.semester?.id ? String(studentData.context.semester.id) : "",
@@ -125,7 +132,8 @@ const StudentDetailMain = ({ id }) => {
       ...changedFields,
       ...(changedFields.department_id !== undefined ? { department_id: Number(changedFields.department_id) || null } : {}),
       ...(changedFields.faculty_id !== undefined ? { faculty_id: Number(changedFields.faculty_id) || null } : {}),
-      ...(changedFields.semester_id !== undefined ? { semester_id: Number(changedFields.semester_id) || null } : {})
+      ...(changedFields.semester_id !== undefined ? { semester_id: Number(changedFields.semester_id) || null } : {}),
+      ...(changedFields.classroom_id !== undefined ? { classroom_id: Number(changedFields.classroom_id) || null } : {}),
     };
 
     updateMutation.mutate(
@@ -140,18 +148,16 @@ const StudentDetailMain = ({ id }) => {
         onError: (err) => {
           notify.error(err?.message || "Failed to update student");
         },
-      }
+      },
     );
   };
 
   const handleApprove = () => {
     const userId = studentData?.user?.id;
-
     if (!userId) {
       notify.error("No student user ID found");
       return;
     }
-
     approveMutation.mutate(
       { userId, profileId: id },
       {
@@ -163,50 +169,129 @@ const StudentDetailMain = ({ id }) => {
 
   const handleResendVerificationEmail = () => {
     const outboxId = getVerificationOutboxId(studentData);
-
     if (!outboxId) {
       notify.error("Verification email outbox ID is missing for this student");
       return;
     }
-
     resendVerificationMutation.mutate(outboxId, {
       onSuccess: () => notify.success("Verification email resent successfully"),
       onError: (err) => notify.error(err?.message || "Failed to resend verification email"),
     });
   };
 
-  const formFields = useMemo(() => [
-    { name: "full_name", label: "Full Name", type: "text", layout: "half", readOnly: true },
-    { name: "student_id", label: "Student ID", type: "text", layout: "half", readOnly: true },
-    { name: "username", label: "Username", type: "text", layout: "half", readOnly: true },
-    { name: "email", label: "Email", type: "text", layout: "half", readOnly: true },
-    { 
-      name: "department_id", 
-      label: "Department", 
-      type: "async-dropdown", 
-      layout: "half",
-      placeholder: "Select department",
-      dropdownProps: { options: departmentOptions, isLoading: isLoadingDepts, getSublabel: (opt) => opt?.meta?.code ? `Code: ${opt.meta.code}` : "" } 
-    },
-    { 
-      name: "faculty_id", 
-      label: "Faculty", 
-      type: "async-dropdown", 
-      layout: "half",
-      placeholder: "Select faculty",
-      dropdownProps: { options: facultyOptions, isLoading: isLoadingFacs, getSublabel: (opt) => opt?.meta?.code ? `Code: ${opt.meta.code}` : "" } 
-    },
-    { 
-      name: "semester_id", 
-      label: "Semester", 
-      type: "async-dropdown", 
-      layout: "half",
-      placeholder: "Select semester",
-      dropdownProps: { options: semesterOptions, isLoading: isLoadingSems, getSublabel: (opt) => opt?.meta?.code || "" } 
-    },
-    { name: "classroom", label: "Classroom", type: "text", layout: "half", readOnly: true },
-    { name: "is_enabled", label: "Enabled", type: "checkbox", checkboxLabel: "Active User", layout: "half" },
-  ], [departmentOptions, facultyOptions, semesterOptions, isLoadingDepts, isLoadingFacs, isLoadingSems]);
+  const handleResetPasswordEmail = () => {
+    resetPasswordMutation.mutate(
+      { id, mode: "email" },
+      {
+        onSuccess: (res) => notify.success(res?.message || "Password reset email queued"),
+        onError: (err) => notify.error(err?.message || "Failed to reset password"),
+      },
+    );
+  };
+
+  const handleResetPasswordManual = () => {
+    const pwd = (values?.manual_password || "").trim();
+    if (!pwd) {
+      notify.error("Enter a new password in the field below first");
+      return;
+    }
+    resetPasswordMutation.mutate(
+      { id, mode: "manual", newPassword: pwd },
+      {
+        onSuccess: (res) => {
+          notify.success(res?.message || "Password updated");
+          setValues((prev) => ({ ...prev, manual_password: "" }));
+        },
+        onError: (err) => notify.error(err?.message || "Failed to reset password"),
+      },
+    );
+  };
+
+  const formFields = useMemo(
+    () => [
+      { name: "full_name", label: "Full Name", type: "text", layout: "half" },
+      { name: "student_id", label: "Student ID", type: "text", layout: "half" },
+      { name: "username", label: "Username", type: "text", layout: "half" },
+      { name: "email", label: "Email", type: "text", layout: "half" },
+      { name: "status_label", label: "Account status", type: "text", layout: "half", readOnly: true },
+      { name: "approval_status", label: "Approval stage", type: "text", layout: "half", readOnly: true },
+      {
+        name: "department_id",
+        label: "Department",
+        type: "async-dropdown",
+        layout: "half",
+        placeholder: "Select department",
+        dropdownProps: {
+          options: departmentOptions,
+          isLoading: isLoadingDepts,
+          getSublabel: (opt) => (opt?.meta?.code ? `Code: ${opt.meta.code}` : ""),
+        },
+      },
+      {
+        name: "faculty_id",
+        label: "Faculty",
+        type: "async-dropdown",
+        layout: "half",
+        placeholder: "Select faculty",
+        dropdownProps: {
+          options: facultyOptions,
+          isLoading: isLoadingFacs,
+          getSublabel: (opt) => (opt?.meta?.code ? `Code: ${opt.meta.code}` : ""),
+        },
+      },
+      {
+        name: "semester_id",
+        label: "Semester",
+        type: "async-dropdown",
+        layout: "half",
+        placeholder: "Select semester",
+        dropdownProps: {
+          options: semesterOptions,
+          isLoading: isLoadingSems,
+          getSublabel: (opt) => opt?.meta?.code || "",
+        },
+      },
+      { name: "classroom_id", label: "Classroom ID", type: "text", layout: "half", placeholder: "Classroom record ID" },
+      { name: "profile_enabled", label: "Profile enabled", type: "checkbox", checkboxLabel: "Student profile active", layout: "half" },
+      { name: "account_enabled", label: "Login allowed", type: "checkbox", checkboxLabel: "User can sign in", layout: "half" },
+      {
+        name: "manual_password",
+        label: "New password (manual)",
+        type: "text",
+        layout: "half",
+        placeholder: "Type password, then use menu → Set manual password",
+      },
+    ],
+    [departmentOptions, facultyOptions, semesterOptions, isLoadingDepts, isLoadingFacs, isLoadingSems],
+  );
+
+  const menuOptions = useMemo(
+    () => [
+      {
+        label: resendVerificationMutation.isPending ? "Resending verification…" : "Resend verification email",
+        action: handleResendVerificationEmail,
+      },
+      {
+        label: resetPasswordMutation.isPending ? "Sending password…" : "Send new password by email",
+        action: handleResetPasswordEmail,
+      },
+      {
+        label: "Set manual password",
+        action: handleResetPasswordManual,
+      },
+      {
+        label: approveMutation.isPending ? "Approving…" : "Approve student",
+        action: handleApprove,
+      },
+    ],
+    [
+      resendVerificationMutation.isPending,
+      resetPasswordMutation.isPending,
+      approveMutation.isPending,
+      values?.manual_password,
+      studentData,
+    ],
+  );
 
   if (isLoading || !values) {
     return <Preloader />;
@@ -217,27 +302,6 @@ const StudentDetailMain = ({ id }) => {
   }
 
   const formStatus = updateMutation.isPending ? "Saving..." : isDirty ? "Not Saved" : "Saved";
-  const headerActions = (
-    <>
-      <button
-        type="button"
-        onClick={handleResendVerificationEmail}
-        disabled={resendVerificationMutation.isPending}
-        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-slate-800 dark:border-slate-700 dark:text-gray-200 dark:hover:bg-slate-700"
-      >
-        {resendVerificationMutation.isPending ? "Resending..." : "Resend Verification Email"}
-      </button>
-
-      <button
-        type="button"
-        onClick={handleApprove}
-        disabled={approveMutation.isPending}
-        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-slate-800 dark:border-slate-700 dark:text-gray-200 dark:hover:bg-slate-700"
-      >
-        {approveMutation.isPending ? "Approving..." : "Approve Student"}
-      </button>
-    </>
-  );
 
   return (
     <div className="max-w-7xl mx-auto w-full">
@@ -250,8 +314,7 @@ const StudentDetailMain = ({ id }) => {
         onChange={handleChange}
         onSave={handleSave}
         isSaving={updateMutation.isPending}
-        menuOptions={[]}
-        headerActions={headerActions}
+        menuOptions={menuOptions}
       />
     </div>
   );

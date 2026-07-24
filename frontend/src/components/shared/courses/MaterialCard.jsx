@@ -458,6 +458,7 @@ const MaterialCard = ({ material, onToggleFavorite, onShareMaterial }) => {
   const canPreviewInBrowser = getCanPreviewInBrowser(material);
 
   const downloadCount = material?.stats?.downloadCount || 0;
+  const viewCount = material?.stats?.viewCount || 0;
 
   const fileIconClass = getFileIcon(fileExtension);
   const semesterBg = getSemesterBg(semesterNumber || 1);
@@ -648,9 +649,15 @@ const MaterialCard = ({ material, onToggleFavorite, onShareMaterial }) => {
         )}
 
         <div className="mt-auto pt-4 border-t border-borderColor/50 dark:border-borderColor-dark/50 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1 text-contentColor">
-            <i className="icofont-download text-sm"></i>
-            <span className="text-xs font-semibold">{downloadCount}</span>
+          <div className="flex items-center gap-3 text-contentColor">
+            <div className="flex items-center gap-1">
+              <i className="icofont-eye-alt text-sm"></i>
+              <span className="text-xs font-semibold">{viewCount}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <i className="icofont-download text-sm"></i>
+              <span className="text-xs font-semibold">{downloadCount}</span>
+            </div>
           </div>
 
           <div className="flex gap-2">

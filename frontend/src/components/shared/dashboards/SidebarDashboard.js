@@ -206,6 +206,10 @@ const SidebarDashboard = () => {
               name: "Feedback Inbox",
               path: "/admin/dashboards/admin-academic/materials/feedback",
             },
+            {
+              name: "Notifications",
+              path: "/admin/dashboards/admin-academic/notifications",
+            },
           ],
         },
         {

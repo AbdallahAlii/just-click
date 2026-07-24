@@ -1076,7 +1076,9 @@ class MaterialsRepo:
             "course": {
                 "id": int(r.course_id),
                 "title": r.course_title,
+                "code": r.course_code,
             },
+            "course_code": r.course_code,
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
         }
 

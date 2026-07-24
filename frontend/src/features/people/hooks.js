@@ -165,7 +165,23 @@ export const useResendOutbox = (options = {}) => {
     mutationFn: peopleApi.resendOutbox,
     onSuccess: (data, outboxId, context) => {
       queryClient.invalidateQueries({ queryKey: peopleKeys.onboarding.lists() });
+      queryClient.invalidateQueries({ queryKey: peopleKeys.students.lists() });
       if (options.onSuccess) options.onSuccess(data, outboxId, context);
+    },
+    ...options,
+  });
+};
+
+export const useResetStudentPassword = (options = {}) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: peopleApi.resetStudentPassword,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: peopleKeys.students.lists() });
+      if (variables?.id) {
+        queryClient.invalidateQueries({ queryKey: peopleKeys.students.detail(variables.id) });
+      }
+      if (options.onSuccess) options.onSuccess(data, variables, context);
     },
     ...options,
   });

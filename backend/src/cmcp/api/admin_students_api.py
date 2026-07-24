@@ -66,6 +66,39 @@ def update_student(company_id: int, student_profile_id: int):
     try:
         payload = request.get_json(silent=True) or {}
         ok, msg, data = svc.update_student(company_id, student_profile_id, payload)
+        if ok:
+            from cmcp.config.database import db
+            db.session.commit()
+        else:
+            from cmcp.config.database import db
+            db.session.rollback()
         return api_success(message=msg, data=data, status_code=200) if ok else api_error(msg, status_code=400)
     except Exception as e:
+        from cmcp.config.database import db
+        db.session.rollback()
+        return _handle_error(e)
+
+
+@bp.post("/<int:student_profile_id>/reset-password")
+@require_company_and_permission(doctype="StudentProfile", action="WRITE")
+def reset_student_password(company_id: int, student_profile_id: int):
+    try:
+        payload = request.get_json(silent=True) or {}
+        mode = str(payload.get("mode") or "email").strip().lower()
+        ok, msg, data = svc.reset_student_password(
+            company_id=company_id,
+            student_profile_id=student_profile_id,
+            mode=mode,
+            new_password=payload.get("new_password"),
+        )
+        if ok:
+            from cmcp.config.database import db
+            db.session.commit()
+        else:
+            from cmcp.config.database import db
+            db.session.rollback()
+        return api_success(message=msg, data=data, status_code=200) if ok else api_error(msg, status_code=400)
+    except Exception as e:
+        from cmcp.config.database import db
+        db.session.rollback()
         return _handle_error(e)

@@ -344,7 +344,9 @@ export function useMaterialAccessReports(params = {}, options = {}) {
   return useQuery({
     queryKey: materialsKeys.accessReports(params),
     queryFn: () => materialsApi.getAccessReports(params),
-    staleTime: 60 * 1000,
+    staleTime: 10 * 1000,
+    refetchInterval: 15 * 1000,
+    refetchIntervalInBackground: false,
     ...options,
   });
 }

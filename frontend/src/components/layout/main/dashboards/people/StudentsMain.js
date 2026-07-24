@@ -40,7 +40,7 @@ const StudentsMain = () => {
     full_name: item.profile?.full_name || "—",
     student_id: item.profile?.student_id || "—",
     department_name: item.context?.department?.name || "—",
-    status_label: item.flags?.is_enabled === true ? "Active" : "Inactive",
+    status_label: item.flags?.status_label || (item.flags?.is_enabled ? "Active" : "Inactive"),
     user_id: item.user?.id,
   }));
 

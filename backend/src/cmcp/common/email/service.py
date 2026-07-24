@@ -163,9 +163,17 @@ class EmailService:
             self.s.flush([row])
             log.info("SMTP send OK outbox_id=%s to=%s", row.id, row.to_email)
         except Exception as e:
-            self.mark_failed(row, str(e))
+            err = str(e)
+            self.mark_failed(row, err)
             self.s.flush([row])
-            log.exception("SMTP send FAILED outbox_id=%s to=%s", row.id, row.to_email)
+            if "WebLoginRequired" in err or "5.7.9" in err:
+                log.error(
+                    "SMTP auth blocked by Gmail for outbox_id=%s. Use a Google App Password "
+                    "(https://myaccount.google.com/apppasswords) in SMTP_PASSWORD, not your normal Gmail password.",
+                    row.id,
+                )
+            else:
+                log.exception("SMTP send FAILED outbox_id=%s to=%s", row.id, row.to_email)
             raise
 
     # ----------------------------

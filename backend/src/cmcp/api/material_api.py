@@ -214,6 +214,7 @@ def create_material(company_id: int):
         # ✅ keep cache invalidation
         if ok:
             bump_list("materials:list", company_id)
+            bump_list("materials:admin:list", company_id, scope="admin")
 
             mid = (
                 (out or {}).get("data", {}).get("material_id")
@@ -296,6 +297,7 @@ def update_material(company_id: int, material_id: int):
             bump_detail("materials:detail", company_id, int(material_id))
             bump_detail("materials:admin:detail", company_id, int(material_id))
             bump_list("materials:list", company_id)
+            bump_list("materials:admin:list", company_id, scope="admin")
 
         return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=400)
 
@@ -338,15 +340,18 @@ def bulk_update_materials(company_id: int):
     except Exception as e:
         return _handle_error(e)
 
-
 @bp.delete("/<int:material_id>/delete")
 @require_company_and_permission(doctype="Material", action="DELETE")
 def delete_material(company_id: int, material_id: int):
     """
-    Delete a material.
+    Delete a single material.
 
-    Default: soft delete (is_enabled=false)
-    Hard delete: send {"permanent": true} (blocked if has interactions)
+    Default:
+        Soft delete by setting is_enabled=False.
+
+    Hard delete:
+        Send {"permanent": true}.
+        Permanent deletion may be blocked when the material has interactions.
     """
     try:
         payload = MaterialDeleteIn.model_validate(_json_body())
@@ -356,21 +361,62 @@ def delete_material(company_id: int, material_id: int):
             material_id=material_id,
             permanent=payload.permanent,
         )
+
         _commit_ok(ok)
 
-        return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=400)
+        if ok:
+            bump_list("materials:list", company_id)
+            bump_list(
+                "materials:admin:list",
+                company_id,
+                scope="admin",
+            )
+
+            bump_detail(
+                "materials:detail",
+                company_id,
+                int(material_id),
+            )
+            bump_detail(
+                "materials:admin:detail",
+                company_id,
+                int(material_id),
+            )
+
+        if ok:
+            return api_success(
+                message=msg,
+                data=out,
+                status_code=200,
+            )
+
+        return api_error(
+            msg,
+            status_code=400,
+        )
+
+    except ValidationError as e:
+        db.session.rollback()
+        return api_error(
+            _clean_pydantic_error(e),
+            status_code=400,
+        )
 
     except Exception as e:
         return _handle_error(e)
 
 
-@bp.post("/bulk-delete")
+@bp.delete("/bulk-delete")
 @require_company_and_permission(doctype="Material", action="DELETE")
 def bulk_delete_materials(company_id: int):
     """
     Bulk delete materials.
 
-    Body: {"material_ids": [1,2,3], "permanent": false}
+    Request body:
+    {
+        "material_ids": [1, 2, 3],
+        "permanent": false
+    }
     """
     try:
         payload = MaterialBulkDeleteIn.model_validate(_json_body())
@@ -380,13 +426,49 @@ def bulk_delete_materials(company_id: int):
             material_ids=payload.material_ids,
             permanent=payload.permanent,
         )
+
         _commit_ok(ok)
 
-        return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=400)
+        if ok:
+            bump_list("materials:list", company_id)
+            bump_list(
+                "materials:admin:list",
+                company_id,
+                scope="admin",
+            )
+
+            for material_id in payload.material_ids:
+                bump_detail(
+                    "materials:detail",
+                    company_id,
+                    int(material_id),
+                )
+                bump_detail(
+                    "materials:admin:detail",
+                    company_id,
+                    int(material_id),
+                )
+
+            return api_success(
+                message=msg,
+                data=out,
+                status_code=200,
+            )
+
+        return api_error(
+            msg,
+            status_code=400,
+        )
+
+    except ValidationError as e:
+        db.session.rollback()
+        return api_error(
+            _clean_pydantic_error(e),
+            status_code=400,
+        )
 
     except Exception as e:
         return _handle_error(e)
-
 
 # =============================================================================
 # STUDENT LIST ENDPOINTS
@@ -618,6 +700,12 @@ def track_material_view(company_id: int, material_id: int):
         )
         _commit_ok(ok)
 
+        if ok and (out or {}).get("tracking", {}).get("counted"):
+            bump_list("materials:list", company_id)
+            bump_list("materials:admin:list", company_id, scope="admin")
+            bump_detail("materials:detail", company_id, int(material_id))
+            bump_detail("materials:admin:detail", company_id, int(material_id))
+
         return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=400)
 
     except Exception as e:
@@ -638,6 +726,12 @@ def track_material_download(company_id: int, material_id: int):
             material_id=material_id,
         )
         _commit_ok(ok)
+
+        if ok and (out or {}).get("tracking", {}).get("counted"):
+            bump_list("materials:list", company_id)
+            bump_list("materials:admin:list", company_id, scope="admin")
+            bump_detail("materials:detail", company_id, int(material_id))
+            bump_detail("materials:admin:detail", company_id, int(material_id))
 
         return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=400)
 

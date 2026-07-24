@@ -426,6 +426,17 @@ class MaterialsService:
                 from cmcp.modules.chatbot.jobs import schedule_index_for_material
                 schedule_index_for_material(material, trigger_type="material_created")
 
+                if material.is_enabled:
+                    try:
+                        from cmcp.modules.notifications.service import NotificationService
+                        NotificationService(session=self.s).notify_material_event(
+                            company_id=int(company_id),
+                            material_id=int(material.id),
+                            event="created",
+                        )
+                    except Exception:
+                        log.exception("material create notification failed material_id=%s", material.id)
+
                 return True, "Material created successfully.", {
                     "material": self._material_summary_out(material)
                 }
@@ -570,6 +581,8 @@ class MaterialsService:
             if "file_url" in data:
                 patch["file_url"] = _validate_link_url(data["file_url"]) if data["file_url"] else None
 
+            was_disabled = not bool(material.is_enabled)
+
             with self.s.begin_nested():
                 if patch:
                     self.repo.update_material(material, patch)
@@ -582,8 +595,22 @@ class MaterialsService:
                 self.s.flush()
 
                 from cmcp.modules.chatbot.jobs import schedule_index_for_material
-                if file_storage or "file_url" in patch:
+                file_changed = bool(file_storage) or "file_url" in patch
+                re_enabled = patch.get("is_enabled") is True and was_disabled
+                is_enabled_now = patch.get("is_enabled", material.is_enabled)
+                if file_changed:
                     schedule_index_for_material(material, trigger_type="material_updated")
+
+                if (file_changed or re_enabled) and is_enabled_now:
+                    try:
+                        from cmcp.modules.notifications.service import NotificationService
+                        NotificationService(session=self.s).notify_material_event(
+                            company_id=int(company_id),
+                            material_id=int(material.id),
+                            event="updated",
+                        )
+                    except Exception:
+                        log.exception("material update notification failed material_id=%s", material.id)
 
                 return True, "Material updated successfully.", {
                     "material": self._material_summary_out(material)

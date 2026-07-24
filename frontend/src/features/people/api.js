@@ -23,6 +23,14 @@ export const peopleApi = {
   getStudentsList: (params) => fetchJSON(`/admin/students/list${toQueryString(params)}`, { method: "GET" }),
   getStudent: (id) => fetchJSON(`/admin/students/${id}`, { method: "GET" }),
   updateStudent: ({ id, payload }) => fetchJSON(`/admin/students/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  resetStudentPassword: ({ id, mode = "email", newPassword }) =>
+    fetchJSON(`/admin/students/${id}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify({
+        mode,
+        ...(newPassword ? { new_password: newPassword } : {}),
+      }),
+    }),
   approveStudent: (userId) => fetchJSON(`/education_people/students/${userId}/approve`, { method: "POST" }),
   bulkApproveStudents: ({ userIds }) => fetchJSON(`/education_people/students/bulk-approve`, {
     method: "POST",
