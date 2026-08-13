@@ -66,19 +66,6 @@ export const getFileIcon = (fileType) => {
   return icons[fileType?.toLowerCase()] || icons.default;
 };
 
-// Semester background colors
-export const getSemesterBg = (semester) => {
-  const semesterBgs = [
-    { semester: 1, bg: "bg-secondaryColor" },
-    { semester: 2, bg: "bg-blue" },
-    { semester: 3, bg: "bg-secondaryColor2" },
-    { semester: 4, bg: "bg-greencolor2" },
-    { semester: 5, bg: "bg-orange" },
-    { semester: 6, bg: "bg-yellow" },
-    { semester: 7, bg: "bg-secondaryColor" },
-    { semester: 8, bg: "bg-blue" },
-  ];
-  
-  const found = semesterBgs.find(item => item.semester === semester);
-  return found ? found.bg : "bg-primaryColor";
-};
+// Neutral semester badge (calm ds tokens — no neon accents)
+export const getSemesterBg = () =>
+  "bg-ds-surface-secondary text-ds-text-secondary";

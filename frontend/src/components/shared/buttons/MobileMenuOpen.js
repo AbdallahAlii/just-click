@@ -8,8 +8,12 @@ const MobileMenuOpen = () => {
     mobileMenu();
   }, []);
   return (
-    <button className="open-mobile-menu text-3xl text-darkdeep1 hover:text-secondaryColor dark:text-whiteColor dark:hover:text-secondaryColor">
-      <i className="icofont-navigation-menu"></i>
+    <button
+      type="button"
+      aria-label="Open menu"
+      className="open-mobile-menu rounded-md text-2xl text-ds-text-primary transition-colors hover:text-ds-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ds-page"
+    >
+      <i className="icofont-navigation-menu" aria-hidden="true"></i>
     </button>
   );
 };

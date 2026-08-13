@@ -1,48 +1,40 @@
-// components/layout/mobile-menu/MobileMenuSimple.jsx
+"use client";
+
+import ButtonPrimary from "@/components/shared/buttons/ButtonPrimary";
 import Link from "next/link";
-import React from "react";
 
 const MobileMenuSimple = () => {
   const navItems = [
-    { name: "Overview", path: "/" },
-    { name: "Courses", path: "/courses" },
-    { name: "About", path: "/about" },
+    { name: "Features", path: "/#features" },
+    { name: "How it works", path: "/#how" },
+    { name: "FAQ", path: "/#faq" },
   ];
 
   return (
     <div className="flex flex-col space-y-6">
-      {/* Navigation Links */}
-      <nav className="flex flex-col space-y-4 border-b border-borderColor dark:border-borderColor-dark pb-6">
-        {navItems.map((item, idx) => (
+      <nav className="flex flex-col space-y-1 border-b border-ds-border pb-6">
+        {navItems.map((item) => (
           <Link
-            key={idx}
+            key={item.path}
             href={item.path}
-            className="text-lg font-medium text-blackColor dark:text-whiteColor hover:text-primaryColor transition-colors"
+            className="rounded-lg px-2 py-2.5 text-base font-medium text-ds-text-primary transition-colors hover:bg-ds-surface-hover hover:text-ds-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action"
           >
             {item.name}
           </Link>
         ))}
       </nav>
 
-      {/* Login & Signup Buttons */}
-      <div className="flex flex-col space-y-3">
-        <Link
-          href="/login"
-          className="text-center py-3 px-4 border border-primaryColor text-primaryColor font-semibold rounded-lg hover:bg-primaryColor/5 transition"
-        >
+      <div className="flex flex-col gap-3">
+        <ButtonPrimary variant="secondary" path="/login" width="full">
           Log in
-        </Link>
-        <Link
-          href="/register"
-          className="text-center py-3 px-4 bg-primaryColor text-white font-semibold rounded-lg hover:bg-primaryColor/90 transition shadow-md"
-        >
-          Get Started
-        </Link>
+        </ButtonPrimary>
+        <ButtonPrimary path="/signup" width="full">
+          Get started
+        </ButtonPrimary>
       </div>
 
-      {/* Optional: Small note or copyright (can be removed) */}
-      <p className="text-xs text-gray-500 dark:text-gray-400 text-center pt-4">
-        CMCP – IT Department Portal
+      <p className="pt-2 text-center text-xs text-ds-text-muted">
+        JustClick — university materials portal
       </p>
     </div>
   );

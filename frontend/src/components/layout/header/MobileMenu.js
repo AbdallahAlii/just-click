@@ -1,4 +1,5 @@
 "use client";
+
 import MobileMenuClose from "@/components/shared/buttons/MobileMenuClose";
 import MobileMenuSimple from "./MobileMenuSimple";
 
@@ -10,17 +11,18 @@ const MobileMenu = () => {
         mobile-menu
         fixed top-0 right-0 h-full
         w-[280px] md:w-[330px]
-        bg-white dark:bg-gray-900
-        shadow-dropdown-secodary
+        bg-ds-surface
+        border-l border-ds-border
+        shadow-lg
         z-high
         transform translate-x-full
-        transition-transform duration-500
+        transition-transform duration-300
         lg:hidden
       "
     >
       <MobileMenuClose />
 
-      <div className="px-5 md:px-30px pt-5 md:pt-10 pb-50px h-full overflow-y-auto">
+      <div className="h-full overflow-y-auto px-5 pb-12 pt-5 md:px-8 md:pt-8">
         <MobileMenuSimple />
       </div>
     </div>

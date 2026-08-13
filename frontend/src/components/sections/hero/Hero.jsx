@@ -1,85 +1,57 @@
-import about10 from "@/assets/images/about/about_10.png";
-import AppleImage from "@/components/shared/animaited-images/AppleImage";
-import BalbImage from "@/components/shared/animaited-images/BalbImage";
-import BookImage from "@/components/shared/animaited-images/BookImage";
-import GlobImage from "@/components/shared/animaited-images/GlobImage";
-import TriangleImage from "@/components/shared/animaited-images/TriangleImage";
 import ButtonPrimary from "@/components/shared/buttons/ButtonPrimary";
-import HeadingXl from "@/components/shared/headings/HeadingXl";
-import HreoName from "@/components/shared/section-names/HreoName";
-import TiltWrapper from "@/components/shared/wrappers/TiltWrapper";
-import Image from "next/image";
+import ProductPreview from "@/components/sections/hero/ProductPreview";
+import { CheckCircle2, FolderOpen, Sparkles } from "lucide-react";
+
+const benefits = [
+  { icon: FolderOpen, text: "Department materials" },
+  { icon: Sparkles, text: "AI study assistant" },
+  { icon: CheckCircle2, text: "Admin-verified uploads" },
+];
 
 const Hero = () => {
   return (
-    <section id="top" data-aos="fade-up">
-      <div className="bg-lightGrey11 dark:bg-lightGrey11-dark relative z-0 overflow-hidden py-50px md:py-100px lg:pt-100px lg:pb-150px 2xl:pt-155px 2xl:pb-250px">
-        {/* animated icons */}
-        <div>
-          <BookImage />
-          <GlobImage />
-          <BalbImage />
-          <AppleImage />
-          <TriangleImage />
-        </div>
+    <section id="top" className="relative overflow-hidden bg-ds-page">
+      <div className="container relative pt-28 pb-16 sm:pt-32 sm:pb-20 lg:pt-36 lg:pb-24">
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-14 xl:gap-16">
+          <div>
+            <span className="mb-4 inline-flex items-center rounded-lg border border-ds-border bg-ds-surface px-3 py-1 text-xs font-semibold uppercase tracking-wider text-ds-action">
+              Centralized class materials portal
+            </span>
 
-        <div className="container 2xl:container-secondary-md relative overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-2 items-center gap-30px">
-            {/* Left */}
-            <div data-aos="fade-up">
-              <HreoName>CENTRALIZED CLASS MATERIALS PORTAL</HreoName>
+            <h1 className="max-w-xl text-4xl font-bold tracking-tight text-ds-text-primary sm:text-5xl lg:text-[3.25rem] lg:leading-[1.15]">
+              All your course materials. One place.
+            </h1>
 
-              <HeadingXl>
-                All your course materials — with{" "}
-                <span className="text-secondaryColor">JustClick AI</span>.
-              </HeadingXl>
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-ds-text-secondary sm:text-lg">
+              Slides, notes, and department resources organized by semester and
+              course — with JustClick AI to summarize, quiz you, or explain any
+              uploaded material. No more digging through chat groups.
+            </p>
 
-              <p className="text-size-15 md:text-lg text-blackColor dark:text-blackColor-dark font-medium mb-10 leading-7 max-w-xl">
-                Slides, notes, and department resources organized by semester
-                and course. Ask AI to summarize, quiz you, or explain any
-                uploaded material — no more digging through chat groups.
-              </p>
-
-              <div className="flex flex-wrap gap-4">
-                <ButtonPrimary path="/signup">
-                  Create free account
-                </ButtonPrimary>
-                <ButtonPrimary color="secondary" path="/login">
-                  Log in
-                </ButtonPrimary>
-              </div>
-
-              <div className="mt-8 flex flex-wrap gap-6">
-                {[
-                  { icon: "📚", text: "Department materials" },
-                  { icon: "🤖", text: "AI study assistant" },
-                  { icon: "✅", text: "Admin-verified uploads" },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 text-sm text-blackColor dark:text-blackColor-dark opacity-70"
-                  >
-                    <span className="text-lg">{item.icon}</span>
-                    <span>{item.text}</span>
-                  </div>
-                ))}
-              </div>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <ButtonPrimary path="/signup">Create free account</ButtonPrimary>
+              <ButtonPrimary variant="secondary" path="/login">
+                Log in
+              </ButtonPrimary>
             </div>
 
-            {/* Right */}
-            <div data-aos="fade-up">
-              <TiltWrapper>
-                <div className="tilt relative z-1">
-                  <Image
-                    className="w-full"
-                    src={about10}
-                    alt="Student using the portal"
-                    placeholder="blur"
-                    priority
-                  />
-                </div>
-              </TiltWrapper>
-            </div>
+            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-3">
+              {benefits.map(({ icon: Icon, text }) => (
+                <li
+                  key={text}
+                  className="flex items-center gap-2 text-sm text-ds-text-secondary"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-ds-border bg-ds-surface text-ds-action">
+                    <Icon className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  {text}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <ProductPreview />
           </div>
         </div>
       </div>

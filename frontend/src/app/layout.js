@@ -65,7 +65,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${hind.variable}`}>
       <body
-        className={`relative leading-[1.8] bg-bodyBg dark:bg-bodyBg-dark z-0 ${inter.className}`}
+        className={`relative z-0 leading-[1.8] bg-ds-page text-ds-text-secondary ${inter.className}`}
       >
         <ReactQueryProvider>
           <SessionProvider>

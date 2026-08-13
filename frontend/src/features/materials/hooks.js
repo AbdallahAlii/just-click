@@ -69,7 +69,7 @@ export function useInfiniteMaterialsList(baseParams = {}, options = {}) {
       materialsApi.getMaterialsList({
         ...baseParams,
         mode: "cursor",
-        limit: baseParams.limit || 10,
+        limit: baseParams.limit || 20,
         cursor: pageParam || undefined,
       }),
     initialPageParam: "",
@@ -81,6 +81,8 @@ export function useInfiniteMaterialsList(baseParams = {}, options = {}) {
       return undefined;
     },
     placeholderData: (previousData) => previousData,
+    staleTime: 1000 * 45,
+    refetchOnWindowFocus: false,
     ...options,
   });
 }
@@ -92,6 +94,9 @@ export function useMaterialFilterOptions(params = {}, options = {}) {
   return useQuery({
     queryKey: materialsKeys.filterOptions(params),
     queryFn: () => materialsApi.getMaterialFilterOptions(params),
+    staleTime: 1000 * 60 * 10,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
     ...options,
   });
 }
@@ -216,11 +221,16 @@ export function useToggleMaterialFavorite(options = {}) {
   return useMutation({
     mutationFn: materialsApi.setFavorite,
     onSuccess: (data, variables, context) => {
-      queryClient.invalidateQueries({ queryKey: materialsKeys.lists() });
+      // Soft refresh lists so optimistic UI stays snappy
+      queryClient.invalidateQueries({
+        queryKey: materialsKeys.lists(),
+        refetchType: "active",
+      });
 
       if (variables?.id) {
         queryClient.invalidateQueries({
           queryKey: materialsKeys.detail(variables.id),
+          refetchType: "active",
         });
       }
 
@@ -242,11 +252,11 @@ export function useTrackMaterialView(options = {}) {
     mutationFn: ({ id, cooldown_seconds }) =>
       materialsApi.trackView(id, cooldown_seconds),
     onSuccess: (data, variables, context) => {
-      queryClient.invalidateQueries({ queryKey: materialsKeys.lists() });
-
+      // Avoid refetching the whole materials list on every view
       if (variables?.id) {
         queryClient.invalidateQueries({
           queryKey: materialsKeys.detail(variables.id),
+          refetchType: "none",
         });
       }
 
@@ -267,10 +277,12 @@ export function useTrackMaterialDownload(options = {}) {
   return useMutation({
     mutationFn: materialsApi.trackDownload,
     onSuccess: (data, id, context) => {
-      queryClient.invalidateQueries({ queryKey: materialsKeys.lists() });
-
+      // Keep list cache; refresh only the open detail when present
       if (id) {
-        queryClient.invalidateQueries({ queryKey: materialsKeys.detail(id) });
+        queryClient.invalidateQueries({
+          queryKey: materialsKeys.detail(id),
+          refetchType: "active",
+        });
       }
 
       if (options.onSuccess) {

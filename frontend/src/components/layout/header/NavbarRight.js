@@ -1,5 +1,6 @@
 "use client";
 
+import ButtonPrimary from "@/components/shared/buttons/ButtonPrimary";
 import MobileMenuOpen from "@/components/shared/buttons/MobileMenuOpen";
 import { useLogout, useMe } from "@/features/auth/hooks";
 import Link from "next/link";
@@ -58,7 +59,7 @@ function getWorkspaceConfig(user) {
   return { label: "Workspace", href: "/materials" };
 }
 
-const NavbarRight = ({ isScrolled }) => {
+const NavbarRight = () => {
   const router = useRouter();
   const { data: meData, isLoading, isError } = useMe();
   const logoutMutation = useLogout();
@@ -84,18 +85,7 @@ const NavbarRight = ({ isScrolled }) => {
 
   const safeUser = isError ? fallbackUser : user;
   const workspace = useMemo(() => getWorkspaceConfig(safeUser), [safeUser]);
-
   const isLoggedIn = !!apiUser && !isError;
-
-  const loginClass = isScrolled
-    ? "text-gray-700 dark:text-gray-200 hover:text-primaryColor"
-    : "text-blackColor/80 dark:text-whiteColor/80 hover:text-blackColor dark:hover:text-whiteColor";
-
-  const btnClass =
-    "bg-primaryColor text-white hover:shadow-lg hover:shadow-primaryColor/25";
-
-  const ghostBtnClass =
-    "text-sm font-semibold px-4 py-2 rounded-full border border-borderColor dark:border-borderColor-dark text-gray-700 dark:text-gray-200 hover:border-primaryColor hover:text-primaryColor transition-all";
 
   const handleLogout = async () => {
     try {
@@ -108,39 +98,33 @@ const NavbarRight = ({ isScrolled }) => {
   };
 
   return (
-    <div className="flex items-center gap-4">
-      {/* Desktop */}
-      <div className="hidden sm:flex items-center gap-3">
+    <div className="flex items-center gap-3 sm:gap-4">
+      <div className="hidden items-center gap-3 sm:flex">
         {isLoading ? (
           <>
-            <div className="h-9 w-24 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
-            <div className="h-9 w-28 rounded-full bg-gray-200 dark:bg-gray-800 animate-pulse" />
+            <div className="h-10 w-20 animate-pulse rounded-xl bg-ds-surface-secondary" />
+            <div className="h-10 w-28 animate-pulse rounded-xl bg-ds-surface-secondary" />
           </>
         ) : isLoggedIn ? (
           <>
-            <Link href="/materials" className={ghostBtnClass}>
+            <ButtonPrimary variant="secondary" path="/materials" size="sm">
               Materials
-            </Link>
-
-            <Link
-              href={workspace.href}
-              className={`text-sm font-bold px-5 py-2 rounded-full transition-all ${btnClass}`}
-            >
-              {workspace.label} →
-            </Link>
-
+            </ButtonPrimary>
+            <ButtonPrimary path={workspace.href} size="sm">
+              {workspace.label}
+            </ButtonPrimary>
             <Link
               href="/user-profile"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-primaryColor text-sm font-bold text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-ds-action text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ds-page"
               title={safeUser.username}
             >
               {safeUser.initials}
             </Link>
-
             <button
+              type="button"
               onClick={handleLogout}
               disabled={logoutMutation.isPending}
-              className={`text-sm font-semibold transition-colors ${loginClass} disabled:opacity-50`}
+              className="text-sm font-semibold text-ds-text-secondary transition-colors hover:text-ds-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action focus-visible:ring-offset-2 disabled:opacity-50 rounded-md"
             >
               {logoutMutation.isPending ? "Signing out..." : "Log out"}
             </button>
@@ -149,22 +133,17 @@ const NavbarRight = ({ isScrolled }) => {
           <>
             <Link
               href="/login"
-              className={`text-sm font-semibold transition-colors ${loginClass}`}
+              className="text-sm font-semibold text-ds-text-secondary transition-colors hover:text-ds-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action focus-visible:ring-offset-2 rounded-md"
             >
               Log in
             </Link>
-
-            <Link
-              href="/signup"
-              className={`text-sm font-bold px-5 py-2 rounded-full transition-all ${btnClass}`}
-            >
-              Get started →
-            </Link>
+            <ButtonPrimary path="/signup" size="sm">
+              Get started
+            </ButtonPrimary>
           </>
         )}
       </div>
 
-      {/* Mobile */}
       <div className="sm:hidden">
         <MobileMenuOpen />
       </div>

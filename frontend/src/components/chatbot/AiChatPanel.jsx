@@ -275,8 +275,8 @@ export default function AiChatPanel({ isOpen, onClose, materialId, rawMaterial }
   if (!isOpen || !mounted) return null;
 
   const shellClass = isFullscreen
-    ? "fixed inset-0 z-[9999] flex bg-[#f8fafc] dark:bg-[#161a21]"
-    : "fixed top-14 right-0 bottom-0 z-[200] flex w-full max-w-[420px] flex-col border-l border-[#e2e8f0] bg-[#f8fafc] shadow-2xl dark:border-[#2d3548] dark:bg-[#161a21]";
+    ? "fixed inset-0 z-[9999] flex bg-ds-page"
+    : "fixed top-14 right-0 bottom-0 z-[200] flex w-full max-w-[480px] flex-col border-l border-ds-border bg-ds-page shadow-xl sm:max-w-[520px]";
 
   const panel = (
     <>
@@ -302,19 +302,19 @@ export default function AiChatPanel({ isOpen, onClose, materialId, rawMaterial }
         )}
 
         {isFullscreen && !sidebarOpen && (
-          <div className="flex w-11 flex-shrink-0 flex-col items-center border-r border-[#e2e8f0] bg-[#f4f6f9] py-3 dark:border-[#2d3548] dark:bg-[#141820]">
+          <div className="flex w-11 flex-shrink-0 flex-col items-center border-r border-ds-border bg-ds-surface-secondary py-3">
             <IconButton label="Show chat history" onClick={() => setSidebarOpen(true)}>
               <IconPanelLeft />
             </IconButton>
           </div>
         )}
 
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-ds-page">
           {!isFullscreen && historyDrawerOpen && (
             <>
               <button
                 type="button"
-                className="absolute inset-0 z-20 bg-black/10 dark:bg-black/30"
+                className="absolute inset-0 z-20 bg-black/20 dark:bg-black/40"
                 onClick={() => setHistoryDrawerOpen(false)}
                 aria-label="Close chat history"
               />
@@ -330,15 +330,26 @@ export default function AiChatPanel({ isOpen, onClose, materialId, rawMaterial }
             </>
           )}
 
-          <header className="flex h-11 flex-shrink-0 items-center gap-2 border-b border-[#e2e8f0] bg-[#f8fafc] px-3 dark:border-[#2d3548] dark:bg-[#161a21]">
-            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-indigo-50 text-indigo-600 dark:bg-[#252d3d] dark:text-indigo-300">
+          <header className="flex h-12 flex-shrink-0 items-center gap-2 border-b border-ds-border bg-ds-surface px-3">
+            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-ds-action/10 text-ds-action">
               <BotGlyph className="h-3.5 w-3.5" />
             </span>
-            <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-100">
-              {headerTitle}
-            </p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-ds-text-primary">
+                {headerTitle}
+              </p>
+              <p className="truncate text-[11px] text-ds-text-muted">JustClick AI</p>
+            </div>
 
             <div className="flex flex-shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                onClick={handleNewChat}
+                className="mr-1 hidden h-8 items-center rounded-md border border-ds-border px-2.5 text-xs font-semibold text-ds-text-secondary transition-colors hover:bg-ds-surface-hover sm:inline-flex"
+              >
+                New chat
+              </button>
+
               {!isFullscreen && (
                 <IconButton
                   label="Chat history"
@@ -371,7 +382,7 @@ export default function AiChatPanel({ isOpen, onClose, materialId, rawMaterial }
             </div>
           </header>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#fbfcfe] dark:bg-[#1b202a]">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-ds-page">
             {!isIndexed && (
               <div className="flex-shrink-0 px-3 pt-3">
                 <AiIndexStatus status={indexStatus} />
@@ -393,7 +404,8 @@ export default function AiChatPanel({ isOpen, onClose, materialId, rawMaterial }
             value={inputValue}
             onChange={setInputValue}
             onSend={() => sendQuestion(inputValue)}
-            disabled={isChatDisabled || isLoading}
+            disabled={isChatDisabled}
+            isSending={isLoading}
             isWide={isFullscreen}
           />
         </div>

@@ -7,10 +7,10 @@ export function IconButton({ label, onClick, active = false, children }) {
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md transition ${
+      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md transition-colors ${
         active
-          ? "bg-slate-200/80 text-slate-800 dark:bg-[#2a3140] dark:text-slate-100"
-          : "text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-[#252b38] dark:hover:text-slate-200"
+          ? "bg-ds-action/10 text-ds-action"
+          : "text-ds-text-muted hover:bg-ds-surface-hover hover:text-ds-text-primary"
       }`}
     >
       {children}

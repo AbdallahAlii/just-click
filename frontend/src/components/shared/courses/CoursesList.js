@@ -1,38 +1,36 @@
 import MaterialListItem from "./MaterialListItem";
 
 const CoursesList = ({ materials, onToggleFavorite, onShareMaterial }) => {
-  return (
-    <div className="w-full">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-separate border-spacing-y-2">
-          <thead>
-            <tr className="text-[11px] uppercase tracking-[0.15em] font-bold text-contentColor/60">
-              <th className="pb-4 pl-2 pr-2">Document Name</th>
-              <th className="pb-4 px-2">File Info</th>
-              <th className="pb-4 px-2">Stats</th>
-              <th className="pb-4 pr-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {materials?.length ? (
-              materials.map((material) => (
-                <MaterialListItem
-                  key={material.id}
-                  material={material}
-                  onToggleFavorite={onToggleFavorite}
-                  onShareMaterial={onShareMaterial}
-                />
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4" className="text-center py-20 text-contentColor">
-                  No materials available.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+  if (!materials?.length) {
+    return (
+      <div className="rounded-xl border border-ds-border bg-ds-surface px-6 py-14 text-center text-sm text-ds-text-muted">
+        No materials available.
       </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-ds-border bg-ds-surface">
+      <div className="hidden border-b border-ds-border px-4 py-2 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-3">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-ds-text-muted">
+          Document
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-ds-text-muted sm:text-right">
+          Activity & actions
+        </span>
+      </div>
+
+      <ul className="divide-y divide-ds-border">
+        {materials.map((material) => (
+          <li key={material.id}>
+            <MaterialListItem
+              material={material}
+              onToggleFavorite={onToggleFavorite}
+              onShareMaterial={onShareMaterial}
+            />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

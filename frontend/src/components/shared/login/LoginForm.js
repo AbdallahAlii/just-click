@@ -16,7 +16,6 @@ const LoginForm = () => {
   const [form, setForm] = useState({
     username: "",
     password: "",
-    remember: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState("");
@@ -26,16 +25,15 @@ const LoginForm = () => {
   }, [user, router]);
 
   const onChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setFormError("");
-    setForm((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
+    setForm((p) => ({ ...p, [name]: value }));
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
 
-    // simple guard
     if (!form.username.trim() || !form.password.trim()) {
       const msg = "Please enter username and password.";
       setFormError(msg);
@@ -59,34 +57,32 @@ const LoginForm = () => {
   };
 
   const labelCls =
-    "block text-[12.5px] font-medium text-gray-700 dark:text-gray-300 mb-1.5";
+    "block text-[12.5px] font-medium text-ds-text-secondary mb-1.5";
 
   const inputCls =
-    "w-full h-11 rounded-lg border border-gray-200 dark:border-gray-700 " +
-    "bg-white dark:bg-gray-900/30 px-3.5 text-sm text-gray-900 dark:text-white " +
-    "placeholder:text-gray-400 dark:placeholder:text-gray-500 " +
-    "focus:outline-none focus:border-primaryColor/50 focus:ring-4 focus:ring-primaryColor/10 transition";
+    "w-full h-11 rounded-lg border border-ds-border " +
+    "bg-ds-surface-input px-3.5 text-sm text-ds-text-primary " +
+    "placeholder:text-ds-text-muted " +
+    "focus:outline-none focus:border-ds-action/50 focus:ring-4 focus:ring-ds-action/10 transition";
 
   const btnBase =
     "w-full h-11 rounded-lg text-white text-sm font-semibold transition " +
-    "focus:outline-none focus:ring-4 focus:ring-primaryColor/20";
+    "focus:outline-none focus:ring-4 focus:ring-ds-action/20";
 
-  const btnEnabled = "bg-primaryColor hover:bg-primaryColor/90";
-  const btnDisabled = "bg-primaryColor/60 cursor-not-allowed";
+  const btnEnabled = "bg-ds-action hover:bg-ds-action-hover";
+  const btnDisabled = "bg-ds-action/60 cursor-not-allowed";
 
   const isLoading = loginMut.isPending;
 
   return (
     <div className="w-full">
       <div className="mb-5">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          Sign in
-        </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <h2 className="text-xl font-semibold text-ds-text-primary">Sign in</h2>
+        <p className="mt-1 text-sm text-ds-text-muted">
           New here?{" "}
           <Link
             href="/signup"
-            className="text-primaryColor font-semibold hover:underline"
+            className="font-semibold text-ds-action hover:underline"
           >
             Create account
           </Link>
@@ -96,7 +92,7 @@ const LoginForm = () => {
       {formError ? (
         <div
           role="alert"
-          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+          className="mb-4 rounded-xl border border-ds-error/30 bg-ds-error/10 px-4 py-3 text-sm text-ds-error"
         >
           {formError}
         </div>
@@ -105,7 +101,7 @@ const LoginForm = () => {
       <form onSubmit={onSubmit} className="space-y-3.5">
         <div>
           <label className={labelCls} htmlFor="username">
-            Username <span className="text-red-400">*</span>
+            Username <span className="text-ds-error">*</span>
           </label>
           <input
             id="username"
@@ -123,13 +119,13 @@ const LoginForm = () => {
         <div>
           <div className="flex items-center justify-between">
             <label className={labelCls} htmlFor="password">
-              Password <span className="text-red-400">*</span>
+              Password <span className="text-ds-error">*</span>
             </label>
 
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="text-xs font-semibold text-primaryColor hover:underline disabled:opacity-60"
+              className="text-xs font-semibold text-ds-action hover:underline disabled:opacity-60"
               disabled={isLoading}
             >
               {showPassword ? "Hide" : "Show"}
@@ -149,22 +145,10 @@ const LoginForm = () => {
           />
         </div>
 
-        <div className="flex items-center justify-between pt-1">
-          <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <input
-              type="checkbox"
-              name="remember"
-              checked={form.remember}
-              onChange={onChange}
-              className="h-4 w-4 rounded border-gray-300 text-primaryColor focus:ring-primaryColor/20"
-              disabled={isLoading}
-            />
-            Remember me
-          </label>
-
+        <div className="flex items-center justify-end pt-1">
           <Link
             href="/forgot-password"
-            className="text-sm text-primaryColor font-semibold hover:underline"
+            className="text-sm font-semibold text-ds-action hover:underline"
           >
             Forgot password?
           </Link>

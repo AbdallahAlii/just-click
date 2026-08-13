@@ -1,8 +1,7 @@
 "use client";
 
-import BalbImage from "@/components/shared/animaited-images/BalbImage";
-import BookImage from "@/components/shared/animaited-images/BookImage";
-import GlobImage from "@/components/shared/animaited-images/GlobImage";
+import MaterialAiAssistant from "@/components/chatbot/MaterialAiAssistant";
+import MaterialFeedbackPanel from "@/components/materials/MaterialFeedbackPanel";
 import {
   useMaterialDetail,
   useToggleMaterialFavorite,
@@ -10,20 +9,17 @@ import {
   useTrackMaterialView,
 } from "@/features/materials/hooks";
 import { mapMaterialToCardModel } from "@/features/materials/utils";
-import { getFileIcon, getSemesterBg } from "@/utils/fileIcons";
+import {
+  downloadBlobFromUrl,
+  formatFileSize,
+  getFileTypeMeta,
+  getMaterialsReturnUrl,
+  getPagesOrSlidesLabel,
+  getSafeFileName,
+  normalizeMaterialUrl,
+} from "@/utils/materialHelpers";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
-import MaterialAiAssistant from "@/components/chatbot/MaterialAiAssistant";
-import MaterialFeedbackPanel from "@/components/materials/MaterialFeedbackPanel";
-
-const formatFileSize = (sizeMb) => {
-  if (sizeMb === null || sizeMb === undefined || Number.isNaN(Number(sizeMb))) {
-    return "—";
-  }
-
-  const num = Number(sizeMb);
-  return `${num % 1 === 0 ? num.toFixed(0) : num.toFixed(1)} MB`;
-};
+import { useEffect, useRef, useState } from "react";
 
 const formatDate = (value) => {
   if (!value) return "—";
@@ -38,162 +34,69 @@ const formatDate = (value) => {
   }).format(date);
 };
 
-const normalizeUrl = (url) => {
-  if (!url) return "#";
-  return String(url).replace("http://127.0.0.1:7000", "http://localhost:7000");
-};
+const secondaryBtnClass =
+  "inline-flex items-center justify-center gap-1.5 rounded-lg border border-ds-border bg-ds-surface px-3 py-2 text-sm font-semibold text-ds-text-primary transition-colors hover:bg-ds-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ds-page disabled:cursor-not-allowed disabled:opacity-50 min-h-[40px]";
 
-const getFilenameFromContentDisposition = (headerValue) => {
-  if (!headerValue) return null;
+const primaryBtnClass =
+  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-ds-action px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ds-action-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ds-page disabled:cursor-not-allowed disabled:opacity-50 min-h-[40px]";
 
-  const utf8Match = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8Match?.[1]) {
-    try {
-      return decodeURIComponent(utf8Match[1].replace(/["]/g, ""));
-    } catch {
-      return utf8Match[1].replace(/["]/g, "");
-    }
-  }
+const DetailSkeleton = () => (
+  <div className="min-h-screen bg-ds-page">
+    <div className="container py-8 lg:py-12 animate-pulse">
+      <div className="mb-8 h-4 w-36 rounded bg-ds-surface-secondary" />
 
-  const normalMatch = headerValue.match(/filename="?([^"]+)"?/i);
-  if (normalMatch?.[1]) return normalMatch[1];
+      <div className="mb-3 h-5 w-16 rounded-lg bg-ds-surface-secondary" />
+      <div className="mb-3 h-9 w-3/4 max-w-2xl rounded-lg bg-ds-surface-secondary" />
+      <div className="mb-2 h-5 w-48 rounded bg-ds-surface-secondary" />
+      <div className="mb-6 h-4 w-40 rounded bg-ds-surface-secondary" />
+      <div className="mb-8 h-4 w-72 rounded bg-ds-surface-secondary" />
 
-  return null;
-};
+      <div className="mb-10 flex flex-wrap gap-2">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="h-11 w-28 rounded-xl bg-ds-surface-secondary"
+          />
+        ))}
+      </div>
 
-const getSafeFileName = (material, rawMaterial) => {
-  const title = material?.title || rawMaterial?.title || "material";
-
-  const ext =
-    material?.file?.extension ||
-    rawMaterial?.file?.extension ||
-    material?.materialType ||
-    rawMaterial?.material_type ||
-    "file";
-
-  const safeTitle = String(title)
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
-    .trim();
-
-  return `${safeTitle || "material"}.${String(ext).replace(/^\./, "")}`;
-};
-
-const getAuthHeaders = () => {
-  if (typeof window === "undefined") return {};
-
-  const token =
-    localStorage.getItem("token") ||
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("authToken");
-
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
-const downloadBlobFromUrl = async ({ url, filename }) => {
-  const response = await fetch(url, {
-    method: "GET",
-    credentials: "include",
-    headers: getAuthHeaders(),
-  });
-
-  if (response.status === 401) {
-    throw new Error("Your login session expired. Please login again.");
-  }
-
-  if (response.status === 403) {
-    throw new Error("You do not have permission to download this file.");
-  }
-
-  if (!response.ok) {
-    throw new Error("Download failed. Please try again.");
-  }
-
-  const contentType = response.headers.get("content-type") || "";
-
-  if (contentType.includes("application/json")) {
-    const text = await response.text().catch(() => "");
-    throw new Error(text || "Download failed. Server returned JSON.");
-  }
-
-  const blob = await response.blob();
-
-  const responseFileName = getFilenameFromContentDisposition(
-    response.headers.get("content-disposition"),
-  );
-
-  const blobUrl = window.URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = blobUrl;
-  link.download = responseFileName || filename;
-  link.style.display = "none";
-
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  window.URL.revokeObjectURL(blobUrl);
-};
-
-const getPagesOrSlidesLabel = (material, rawMaterial) => {
-  const mappedFile = material?.file || {};
-  const rawFile = rawMaterial?.file || {};
-
-  const slideCount = mappedFile.slideCount ?? rawFile.slide_count;
-  const pageCount = mappedFile.pageCount ?? rawFile.page_count;
-
-  if (slideCount != null) return `${slideCount} Slides`;
-  if (pageCount != null) return `${pageCount} Pages`;
-
-  return "—";
-};
-
-const HeroSkeleton = () => (
-  <section className="relative overflow-hidden bg-blueDark py-16 lg:py-24 animate-pulse">
-    <div className="container relative z-10">
-      <div className="max-w-4xl">
-        <div className="h-12 w-2/3 rounded bg-white/10 mb-4" />
-        <div className="h-12 w-1/2 rounded bg-white/10 mb-6" />
-        <div className="h-5 w-full max-w-2xl rounded bg-white/10 mb-3" />
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+        <div className="space-y-6 lg:col-span-8">
+          <div className="h-40 rounded-2xl border border-ds-border bg-ds-surface" />
+          <div className="h-32 rounded-2xl border border-ds-border bg-ds-surface" />
+          <div className="h-48 rounded-2xl border border-ds-border bg-ds-surface" />
+        </div>
+        <div className="space-y-4 lg:col-span-4">
+          <div className="h-48 rounded-2xl border border-ds-border bg-ds-surface" />
+          <div className="h-40 rounded-2xl border border-ds-border bg-ds-surface" />
+        </div>
       </div>
     </div>
-  </section>
+  </div>
 );
 
-const ContentSkeleton = () => (
-  <main className="container py-12 lg:py-20">
-    <div className="h-96 rounded-2xl bg-gray-200 dark:bg-gray-800 animate-pulse" />
-  </main>
-);
-
-const ErrorState = ({ title, message, showRetry = true }) => (
-  <div className="container py-16 lg:py-24">
-    <div className="max-w-2xl mx-auto text-center bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl shadow-sm p-8 lg:p-10">
-      <h1 className="text-2xl lg:text-3xl font-bold text-blackColor dark:text-white mb-4">
-        {title}
-      </h1>
-
-      <p className="text-paragraphColor dark:text-gray-400 leading-relaxed mb-8">
-        {message}
-      </p>
-
-      <div className="flex items-center justify-center gap-3 flex-wrap">
-        <Link
-          href="/materials"
-          className="px-5 py-3 rounded-xl bg-primaryColor text-white font-bold hover:opacity-90 transition-all"
-        >
-          Back to Materials
-        </Link>
-
-        {showRetry ? (
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="px-5 py-3 rounded-xl border border-gray-200 dark:border-gray-700 text-blackColor dark:text-white font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
-          >
-            Try Again
-          </button>
-        ) : null}
+const ErrorState = ({ title, message, showRetry = true, backHref = "/materials" }) => (
+  <div className="min-h-screen bg-ds-page">
+    <div className="container py-16 lg:py-24">
+      <div className="mx-auto max-w-lg text-center">
+        <h1 className="mb-3 text-2xl font-bold tracking-tight text-ds-text-primary">
+          {title}
+        </h1>
+        <p className="mb-8 text-ds-text-secondary leading-relaxed">{message}</p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link href={backHref} className={primaryBtnClass}>
+            Back to materials
+          </Link>
+          {showRetry ? (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className={secondaryBtnClass}
+            >
+              Try again
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   </div>
@@ -201,6 +104,7 @@ const ErrorState = ({ title, message, showRetry = true }) => (
 
 const MaterialDetailsPrimary = ({ id }) => {
   const numericId = Number(id);
+  const [backHref, setBackHref] = useState("/materials");
 
   const { data, isLoading, isError, error } = useMaterialDetail(numericId, {
     retry: 1,
@@ -214,6 +118,10 @@ const MaterialDetailsPrimary = ({ id }) => {
 
   const hasTrackedViewRef = useRef(false);
   const rawMaterial = data?.data?.data;
+
+  useEffect(() => {
+    setBackHref(getMaterialsReturnUrl("/materials"));
+  }, []);
 
   useEffect(() => {
     if (!numericId || !rawMaterial) return;
@@ -238,17 +146,13 @@ const MaterialDetailsPrimary = ({ id }) => {
         title="Invalid material link"
         message="The material ID in the URL is not valid."
         showRetry={false}
+        backHref={backHref}
       />
     );
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-900">
-        <HeroSkeleton />
-        <ContentSkeleton />
-      </div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (isError) {
@@ -266,6 +170,7 @@ const MaterialDetailsPrimary = ({ id }) => {
             : "We were unable to load this material right now."
         }
         showRetry={status !== 404}
+        backHref={backHref}
       />
     );
   }
@@ -276,6 +181,7 @@ const MaterialDetailsPrimary = ({ id }) => {
         title="Material not found"
         message="No material data was returned from the server."
         showRetry={false}
+        backHref={backHref}
       />
     );
   }
@@ -288,8 +194,10 @@ const MaterialDetailsPrimary = ({ id }) => {
   const mappedFile = material?.file || {};
   const rawFile = rawMaterial?.file || {};
 
-  const readHref = normalizeUrl(mappedFile.readUrl || rawFile.read_url || "");
-  const downloadHref = normalizeUrl(
+  const readHref = normalizeMaterialUrl(
+    mappedFile.readUrl || rawFile.read_url || "",
+  );
+  const downloadHref = normalizeMaterialUrl(
     mappedFile.downloadUrl || rawFile.download_url || "",
   );
 
@@ -301,20 +209,38 @@ const MaterialDetailsPrimary = ({ id }) => {
     rawMaterial?.flags?.is_downloadable ??
     false;
 
-  const canPreviewFile =
-    Boolean(readHref && readHref !== "#") && Boolean(canPreviewInBrowser);
-
-  const canDownloadFile =
-    Boolean(downloadHref && downloadHref !== "#") && Boolean(isDownloadable);
+  const canPreviewFile = Boolean(readHref) && Boolean(canPreviewInBrowser);
+  const canDownloadFile = Boolean(downloadHref) && Boolean(isDownloadable);
 
   const isFavorite =
     material?.isFavorite ?? rawMaterial?.user_state?.is_favorite ?? false;
 
-  const fileIconClass = getFileIcon(
-    mappedFile.extension || rawFile.extension || material?.materialType,
-  );
+  const fileExt =
+    mappedFile.extension || rawFile.extension || material?.materialType;
+  const { label: fileTypeLabel, Icon: FileTypeIcon } = getFileTypeMeta(fileExt);
 
-  const semesterBg = getSemesterBg(material?.semesterNumber || 1);
+  const pagesOrSlides =
+    getPagesOrSlidesLabel({
+      ...material,
+      file: { ...rawFile, ...mappedFile },
+    }) || null;
+
+  const fileSize =
+    formatFileSize(mappedFile.sizeMb ?? rawFile.size_mb) || null;
+
+  const viewCount = material?.stats?.viewCount ?? 0;
+  const downloadCount = material?.stats?.downloadCount ?? 0;
+
+  const metaParts = [
+    fileSize,
+    pagesOrSlides,
+    `${viewCount} views`,
+    `${downloadCount} downloads`,
+  ].filter(Boolean);
+
+  const semesterChapter = [material?.semesterName, material?.chapterTitle]
+    .filter(Boolean)
+    .join(" · ");
 
   const shareUrl =
     typeof window !== "undefined"
@@ -339,19 +265,20 @@ const MaterialDetailsPrimary = ({ id }) => {
     try {
       await downloadBlobFromUrl({
         url: downloadHref,
-        filename: getSafeFileName(material, rawMaterial),
+        filename: getSafeFileName({
+          ...material,
+          file: { ...rawFile, ...mappedFile },
+        }),
       });
-
       trackDownload(numericId);
-    } catch (error) {
-      console.error("Download failed:", error);
-      alert(error?.message || "Download failed. Please check your connection.");
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert(err?.message || "Download failed. Please check your connection.");
     }
   };
 
   const handleCopyLink = async () => {
     if (!shareUrl) return;
-
     try {
       await navigator.clipboard.writeText(shareUrl);
       window.alert("Link copied successfully.");
@@ -362,7 +289,6 @@ const MaterialDetailsPrimary = ({ id }) => {
 
   const handleShareWhatsApp = () => {
     if (!shareUrl) return;
-
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
     window.open(whatsappUrl, "_blank", "noopener,noreferrer");
   };
@@ -384,164 +310,182 @@ const MaterialDetailsPrimary = ({ id }) => {
     handleShareWhatsApp();
   };
 
-  const fileType =
-    mappedFile.extension?.toUpperCase() ||
-    rawFile.extension?.toUpperCase() ||
-    "—";
-
-  const fileSize = formatFileSize(mappedFile.sizeMb ?? rawFile.size_mb);
+  const infoFields = [
+    { label: "Department", value: material?.departmentName || "—" },
+    { label: "Semester", value: material?.semesterName || "—" },
+    { label: "Course", value: material?.courseTitle || "—" },
+    { label: "Course Code", value: material?.courseCode || "—" },
+    { label: "Chapter", value: material?.chapterTitle || "—" },
+    { label: "Academic Year", value: material?.academicYearName || "—" },
+    { label: "File Type", value: fileTypeLabel || "—" },
+    { label: "Size", value: fileSize || "—" },
+    { label: "Length", value: pagesOrSlides || "—" },
+    { label: "Created", value: formatDate(material?.createdAt) },
+    { label: "Updated", value: formatDate(material?.updatedAt) },
+    { label: "Downloads", value: String(downloadCount) },
+  ];
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
-      <section className="relative overflow-hidden bg-blueDark py-16 lg:py-24">
-        <div className="opacity-30">
-          <BookImage />
-          <GlobImage />
-          <BalbImage />
-        </div>
+    <div className="min-h-screen bg-ds-page">
+      <div className="container py-6 lg:py-8">
+        <Link
+          href={backHref}
+          className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-action"
+        >
+          <i className="icofont-long-arrow-left" aria-hidden="true" />
+          Back to materials
+        </Link>
 
-        <div className="container relative z-10">
-          <div className="max-w-4xl" data-aos="fade-up">
-            <div className="flex flex-wrap gap-2 mb-6">
+        <header className="mb-8">
+          <span className="mb-2 inline-flex items-center gap-1.5 rounded-md border border-ds-border bg-ds-surface-secondary px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-ds-text-secondary">
+            <FileTypeIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            {fileTypeLabel}
+          </span>
+
+          <h1 className="text-2xl font-bold tracking-tight text-ds-text-primary sm:text-3xl lg:text-[2.15rem] lg:leading-tight">
+            {material?.title || "Untitled Material"}
+          </h1>
+
+          {material?.courseTitle ? (
+            <p className="mt-1.5 text-base text-ds-text-secondary">
+              {material.courseTitle}
               {material?.courseCode ? (
-                <span className="px-4 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-xs font-bold text-white uppercase tracking-wider">
-                  {material.courseCode}
+                <span className="text-ds-text-muted">
+                  {" "}
+                  ({material.courseCode})
                 </span>
               ) : null}
-
-              {material?.departmentName ? (
-                <span className="px-4 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded-full text-xs font-bold text-white uppercase tracking-wider">
-                  {material.departmentName}
-                </span>
-              ) : null}
-
-              {material?.semesterName ? (
-                <span
-                  className={`px-4 py-1 rounded-full text-xs font-bold text-white uppercase tracking-wider ${semesterBg}`}
-                >
-                  {material.semesterName}
-                </span>
-              ) : null}
-
-              {material?.flags?.isEnabled ? (
-                <span className="px-4 py-1 bg-secondaryColor/20 border border-secondaryColor/30 text-secondaryColor rounded-full text-xs font-bold uppercase tracking-wider">
-                  Enabled
-                </span>
-              ) : (
-                <span className="px-4 py-1 bg-red-500/20 border border-red-400/30 text-red-300 rounded-full text-xs font-bold uppercase tracking-wider">
-                  Disabled
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-white text-3xl shrink-0">
-                <i className={fileIconClass}></i>
-              </div>
-
-              <div>
-                <p className="text-sm text-white/70 uppercase tracking-widest font-bold">
-                  {material?.materialType || "Material"}
-                </p>
-                <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight">
-                  {material?.title || "Untitled Material"}
-                </h1>
-              </div>
-            </div>
-
-            <p className="text-lg md:text-xl text-white/80 leading-relaxed max-w-3xl mb-10">
-              {material?.description ||
-                "No description was provided for this material."}
             </p>
+          ) : null}
+
+          {semesterChapter ? (
+            <p className="mt-1 text-sm text-ds-text-muted">{semesterChapter}</p>
+          ) : null}
+
+          {metaParts.length ? (
+            <p className="mt-3 text-sm text-ds-text-muted">
+              {metaParts.join(" · ")}
+            </p>
+          ) : null}
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleOpenDownload}
+              disabled={!canDownloadFile}
+              className={primaryBtnClass}
+            >
+              <i className="icofont-download" aria-hidden="true" />
+              Download
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenPreview}
+              disabled={!canPreviewFile}
+              className={secondaryBtnClass}
+            >
+              <i className="icofont-eye-alt" aria-hidden="true" />
+              Preview
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                toggleFavorite({
+                  id: numericId,
+                  is_favorite: !isFavorite,
+                })
+              }
+              className={secondaryBtnClass}
+              aria-pressed={isFavorite}
+            >
+              <i
+                className={isFavorite ? "icofont-heart" : "icofont-heart-alt"}
+                aria-hidden="true"
+              />
+              {isFavorite ? "Favorited" : "Favorite"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className={secondaryBtnClass}
+            >
+              <i className="icofont-copy" aria-hidden="true" />
+              Copy link
+            </button>
+
+            <button
+              type="button"
+              onClick={handleShareWhatsApp}
+              className={secondaryBtnClass}
+            >
+              <i className="icofont-brand-whatsapp" aria-hidden="true" />
+              WhatsApp
+            </button>
+
+            <button
+              type="button"
+              onClick={handleNativeShare}
+              className={secondaryBtnClass}
+            >
+              <i className="icofont-share" aria-hidden="true" />
+              Share
+            </button>
           </div>
-        </div>
-      </section>
+        </header>
 
-      <main className="container py-12 lg:py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          <div className="lg:col-span-8 space-y-12">
-            <section data-aos="fade-up">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-1 h-8 bg-secondaryColor rounded-full"></div>
-                <h2 className="text-3xl font-bold text-blackColor dark:text-white">
-                  About this material
-                </h2>
-              </div>
-
-              <div className="text-paragraphColor dark:text-gray-400 text-lg leading-relaxed space-y-6">
-                <p>
-                  {material?.description ||
-                    "No detailed description is available for this material yet."}
-                </p>
-
-                <div className="bg-lightGrey11 dark:bg-gray-800 p-8 rounded-2xl border border-gray-100 dark:border-gray-700">
-                  <h4 className="text-xl font-bold text-blackColor dark:text-white mb-4">
-                    Learning Objectives
-                  </h4>
-
-                  {material.learningObjectives?.length ? (
-                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {material.learningObjectives.map((item, i) => (
-                        <li
-                          key={`${item}-${i}`}
-                          className="flex items-start gap-2"
-                        >
-                          <i className="icofont-check-circled text-secondaryColor mt-1"></i>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-paragraphColor dark:text-gray-400">
-                      No learning objectives were added for this material.
-                    </p>
-                  )}
-                </div>
-              </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:gap-8">
+          <div className="space-y-6 lg:col-span-9">
+            <section>
+              <h2 className="mb-3 text-lg font-semibold text-ds-text-primary">
+                About
+              </h2>
+              <p className="text-ds-text-secondary leading-relaxed">
+                {material?.description ||
+                  "No description was provided for this material."}
+              </p>
             </section>
 
-            <section
-              className="grid grid-cols-2 md:grid-cols-3 gap-8 p-8 border border-gray-100 dark:border-gray-800 rounded-2xl bg-white dark:bg-gray-900"
-              data-aos="fade-up"
-            >
-              {[
-                { label: "Department", value: material?.departmentName || "—" },
-                { label: "Semester", value: material?.semesterName || "—" },
-                { label: "Course", value: material?.courseTitle || "—" },
-                { label: "Course Code", value: material?.courseCode || "—" },
-                { label: "Chapter", value: material?.chapterTitle || "—" },
-                {
-                  label: "Academic Year",
-                  value: material?.academicYearName || "—",
-                },
-                {
-                  label: "File Type",
-                  value: fileType,
-                },
-                {
-                  label: "Size",
-                  value: fileSize,
-                },
-                {
-                  label: "Length",
-                  value: getPagesOrSlidesLabel(material, rawMaterial),
-                },
-                { label: "Created", value: formatDate(material?.createdAt) },
-                { label: "Updated", value: formatDate(material?.updatedAt) },
-                {
-                  label: "Downloads",
-                  value: String(material?.stats?.downloadCount || 0),
-                },
-              ].map((info) => (
-                <div key={info.label}>
-                  <p className="text-xs font-bold text-secondaryColor uppercase tracking-widest mb-1">
-                    {info.label}
-                  </p>
-                  <p className="font-bold text-blackColor dark:text-white break-words">
-                    {info.value}
-                  </p>
-                </div>
-              ))}
+            {material.learningObjectives?.length ? (
+              <section>
+                <h2 className="mb-3 text-lg font-semibold text-ds-text-primary">
+                  Learning objectives
+                </h2>
+                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {material.learningObjectives.map((item, i) => (
+                    <li
+                      key={`${item}-${i}`}
+                      className="flex items-start gap-2 text-ds-text-secondary"
+                    >
+                      <i
+                        className="icofont-check-circled mt-0.5 text-ds-action"
+                        aria-hidden="true"
+                      />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <section className="rounded-xl border border-ds-border bg-ds-surface p-5 sm:p-6">
+              <h2 className="mb-4 text-lg font-semibold text-ds-text-primary">
+                Details
+              </h2>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                {infoFields.map((info) => (
+                  <div key={info.label}>
+                    <p className="mb-0.5 text-[11px] font-medium uppercase tracking-wide text-ds-text-muted">
+                      {info.label}
+                    </p>
+                    <p className="break-words text-sm font-medium text-ds-text-primary">
+                      {info.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </section>
 
             <MaterialFeedbackPanel
@@ -550,155 +494,54 @@ const MaterialDetailsPrimary = ({ id }) => {
             />
           </div>
 
-          <div className="lg:col-span-4">
-            <div className="sticky top-28 space-y-6">
-              <div
-                className="bg-blueDark p-8 rounded-2xl shadow-2xl relative overflow-hidden"
-                data-aos="fade-left"
-              >
-                <h3 className="text-xl font-bold text-white mb-6 relative z-10">
-                  Quick Actions
-                </h3>
-
-                <div className="space-y-4 relative z-10">
-                  <MaterialAiAssistant materialId={numericId} rawMaterial={rawMaterial} />
-
-                  <button
-                    type="button"
-                    onClick={handleOpenPreview}
-                    disabled={!canPreviewFile}
-                    className={`w-full py-4 font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
-                      canPreviewFile
-                        ? "bg-secondaryColor hover:bg-white text-white hover:text-secondaryColor"
-                        : "bg-secondaryColor/40 text-white/60 cursor-not-allowed"
-                    }`}
-                  >
-                    <i className="icofont-eye-alt"></i>
-                    {canPreviewFile ? "Open Preview" : "Preview Unavailable"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleOpenDownload}
-                    disabled={!canDownloadFile}
-                    className={`w-full py-4 border font-bold rounded-lg transition-all duration-300 text-center block ${
-                      canDownloadFile
-                        ? "bg-white/10 hover:bg-white/20 text-white border-white/20"
-                        : "bg-white/5 text-white/50 border-white/10 cursor-not-allowed"
-                    }`}
-                  >
-                    Download File
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleNativeShare}
-                    className="w-full py-4 font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 bg-white/5 text-white/80 border border-white/10 hover:bg-white/10"
-                  >
-                    <i className="icofont-share"></i>
-                    Share Material
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleCopyLink}
-                    className="w-full py-4 font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 bg-white/5 text-white/80 border border-white/10 hover:bg-white/10"
-                  >
-                    <i className="icofont-copy"></i>
-                    Copy Link
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleShareWhatsApp}
-                    className="w-full py-4 font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 bg-[#25D366]/20 text-[#25D366] border border-[#25D366]/30 hover:bg-[#25D366] hover:text-white"
-                  >
-                    <i className="icofont-brand-whatsapp"></i>
-                    Share on WhatsApp
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      toggleFavorite({
-                        id: numericId,
-                        is_favorite: !isFavorite,
-                      })
-                    }
-                    className={`w-full py-4 font-bold rounded-lg transition-all duration-300 flex items-center justify-center gap-2 ${
-                      isFavorite
-                        ? "bg-red-500/20 text-red-500 border border-red-500/30 hover:bg-red-500 hover:text-white"
-                        : "bg-white/5 text-white/80 border border-white/10 hover:bg-white/10"
-                    }`}
-                  >
-                    <i
-                      className={
-                        isFavorite ? "icofont-heart" : "icofont-heart-alt"
-                      }
-                    ></i>
-                    {isFavorite ? "Saved to Favorites" : "Save to Favorites"}
-                  </button>
-                </div>
-
-                <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-secondaryColor/20 rounded-full blur-3xl"></div>
+          <aside className="lg:col-span-3">
+            <div className="sticky top-24 space-y-3">
+              <div className="rounded-xl border border-ds-border bg-ds-surface p-4">
+                <MaterialAiAssistant
+                  materialId={numericId}
+                  rawMaterial={rawMaterial}
+                />
               </div>
 
-              <div
-                className="bg-lightGrey11 dark:bg-gray-800 p-8 rounded-2xl border border-secondaryColor/20"
-                data-aos="fade-left"
-                data-aos-delay="100"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 bg-secondaryColor rounded-xl flex items-center justify-center text-white text-2xl">
-                    <i className={fileIconClass}></i>
+              <div className="rounded-xl border border-ds-border bg-ds-surface p-4">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-ds-border bg-ds-surface-secondary text-ds-action">
+                    <FileTypeIcon className="h-5 w-5" aria-hidden="true" />
                   </div>
-
                   <div>
-                    <h4 className="font-bold text-blackColor dark:text-white">
-                      File Summary
-                    </h4>
-                    <p className="text-xs text-secondaryColor font-bold uppercase">
+                    <h3 className="font-semibold text-ds-text-primary">
+                      File summary
+                    </h3>
+                    <p className="text-xs text-ds-text-muted">
                       {material?.materialType || "Material"}
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-3 text-sm">
+                <dl className="space-y-2.5 text-sm">
                   {[
-                    ["Type", fileType],
-                    ["Size", fileSize],
-                    ["Length", getPagesOrSlidesLabel(material, rawMaterial)],
-                    ["Views", material?.stats?.viewCount || 0],
-                    ["Downloads", material?.stats?.downloadCount || 0],
+                    ["Type", fileTypeLabel],
+                    ["Size", fileSize || "—"],
+                    ["Length", pagesOrSlides || "—"],
+                    ["Views", viewCount],
+                    ["Downloads", downloadCount],
                   ].map(([label, value]) => (
                     <div
                       key={label}
                       className="flex items-center justify-between gap-3"
                     >
-                      <span className="text-paragraphColor dark:text-gray-400">
-                        {label}
-                      </span>
-                      <span className="font-bold text-blackColor dark:text-white uppercase">
+                      <dt className="text-ds-text-muted">{label}</dt>
+                      <dd className="font-medium text-ds-text-primary">
                         {value}
-                      </span>
+                      </dd>
                     </div>
                   ))}
-                </div>
-              </div>
-
-              <div className="px-4 text-center">
-                <Link
-                  href="/materials"
-                  className="inline-flex items-center gap-2 text-sm font-bold text-primaryColor hover:underline"
-                >
-                  <i className="icofont-long-arrow-left"></i>
-                  Back to all materials
-                </Link>
+                </dl>
               </div>
             </div>
-          </div>
+          </aside>
         </div>
-      </main>
+      </div>
     </div>
   );
 };

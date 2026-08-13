@@ -1,8 +1,8 @@
 "use client";
 
-import ButtonPrimary from "@/components/shared/buttons/ButtonPrimary";
-import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import SectionHeader from "@/components/sections/landing/SectionHeader";
 
 const faqs = [
   {
@@ -36,96 +36,62 @@ const Faq = () => {
   const [openIndex, setOpenIndex] = useState(0);
 
   return (
-    <section id="faq" className="py-20 lg:py-100px bg-white dark:bg-gray-900">
+    <section id="faq" className="bg-ds-surface-secondary py-16 sm:py-20 lg:py-24">
       <div className="container">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-30px">
-          {/* Left */}
-          <div className="lg:col-span-3" data-aos="fade-up">
-            <div className="lg:relative">
-              <h4 className="text-6xl lg:text-8xl text-lightGrey dark:text-blackColor-dark opacity-30 uppercase font-bold leading-[1]">
-                FAQ
-              </h4>
-            </div>
-          </div>
+        <div className="mx-auto max-w-3xl">
+          <SectionHeader
+            eyebrow="FAQ"
+            title="Common questions"
+            description="Quick answers about access, materials, and JustClick AI."
+          />
 
-          {/* Right */}
-          <div className="lg:col-span-9" data-aos="fade-up">
-            <div className="space-y-4">
-              {faqs.map((faq, index) => (
+          <div className="space-y-3">
+            {faqs.map((faq, index) => {
+              const isOpen = openIndex === index;
+              const panelId = `faq-panel-${index}`;
+              const buttonId = `faq-button-${index}`;
+
+              return (
                 <div
-                  key={index}
-                  className="border border-borderColor dark:border-borderColor-dark rounded-2xl overflow-hidden bg-lightGrey10 dark:bg-lightGrey10-dark"
+                  key={faq.question}
+                  className="overflow-hidden rounded-xl border border-ds-border bg-ds-surface"
                 >
                   <button
-                    onClick={() =>
-                      setOpenIndex(openIndex === index ? null : index)
-                    }
-                    className="w-full px-6 py-5 flex items-center justify-between text-left font-semibold text-blackColor dark:text-whiteColor hover:bg-white dark:hover:bg-gray-800 transition-colors"
+                    id={buttonId}
+                    type="button"
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    onClick={() => setOpenIndex(isOpen ? null : index)}
+                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-ds-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ds-action sm:px-6 sm:py-5"
                   >
-                    <span className="text-lg">{faq.question}</span>
-                    <svg
-                      className={`w-5 h-5 transform transition-transform duration-300 text-secondaryColor ${
-                        openIndex === index ? "rotate-180" : ""
+                    <span className="text-base font-semibold text-ds-text-primary sm:text-lg">
+                      {faq.question}
+                    </span>
+                    <ChevronDown
+                      className={`h-5 w-5 shrink-0 text-ds-text-muted transition-transform duration-200 ${
+                        isOpen ? "rotate-180" : ""
                       }`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
+                      aria-hidden="true"
+                    />
                   </button>
 
                   <div
-                    className={`overflow-hidden transition-all duration-300 ${
-                      openIndex === index ? "max-h-96" : "max-h-0"
+                    id={panelId}
+                    role="region"
+                    aria-labelledby={buttonId}
+                    className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                      isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
                     }`}
                   >
-                    <div className="px-6 pb-5 text-paragraphColor dark:text-contentColor-dark">
-                      {faq.answer}
+                    <div className="overflow-hidden">
+                      <p className="px-5 pb-5 text-ds-text-secondary leading-relaxed sm:px-6">
+                        {faq.answer}
+                      </p>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Final CTA */}
-            <div
-              className="mt-12 text-center bg-gradient-to-r from-primaryColor to-secondaryColor rounded-2xl p-8 md:p-12"
-              data-aos="fade-up"
-            >
-              <h3 className="text-2xl md:text-3xl font-bold text-white mb-4">
-                Ready to study smarter this semester?
-              </h3>
-              <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">
-                Stop searching and start learning — everything is organized in
-                one place with AI on every material.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <ButtonPrimary
-                  path="/signup"
-                  className="bg-white text-primaryColor hover:bg-gray-100 border-0"
-                >
-                  Create free account
-                </ButtonPrimary>
-
-                <Link
-                  href="/login"
-                  className="px-8 py-4 text-white border-2 border-white/30 rounded-lg hover:bg-white/10 transition-colors font-medium"
-                >
-                  Log in →
-                </Link>
-              </div>
-
-              <p className="text-white/70 text-sm mt-6">
-                Takes less than 2 minutes.
-              </p>
-            </div>
+              );
+            })}
           </div>
         </div>
       </div>

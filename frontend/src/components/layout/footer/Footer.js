@@ -1,62 +1,49 @@
 "use client";
 
-import BalbImage from "@/components/shared/animaited-images/BalbImage";
-
-import GlobImage from "@/components/shared/animaited-images/GlobImage";
-import TriangleImage from "@/components/shared/animaited-images/TriangleImage";
 import Link from "next/link";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="relative overflow-hidden border-t border-black/5 bg-lightGrey10 dark:bg-lightGrey10-dark dark:border-white/10">
-      {/* animated shapes */}
-      <div className="pointer-events-none">
-        <GlobImage type={"secondary"} />
-        <BalbImage type={"secondary"} />
-        <TriangleImage type={"secondary"} />
-      </div>
-
-      <div className="relative z-10 mx-auto w-full max-w-[1400px] px-6 sm:px-8 lg:px-12">
-        <div className="flex flex-col gap-10 py-14 md:flex-row md:items-center md:justify-between md:gap-14 md:py-16 lg:py-20">
-          {/* left */}
+    <footer className="border-t border-ds-border bg-ds-surface-secondary">
+      <div className="mx-auto w-full max-w-[1400px] px-6 sm:px-8 lg:px-12">
+        <div className="flex flex-col gap-10 py-12 md:flex-row md:items-center md:justify-between md:gap-14 md:py-14">
           <div className="flex min-w-0 flex-1 items-center">
             <Link
-              href="/materials"
-              className="inline-flex items-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primaryColor"
+              href="/"
+              className="inline-flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action focus-visible:ring-offset-2 dark:focus-visible:ring-offset-ds-page"
             >
-              <span className="text-[30px] md:text-[34px] font-extrabold tracking-[-0.03em] text-blackColor2 dark:text-blackColor2-dark transition-opacity hover:opacity-80">
-                Just<span className="text-primaryColor">Click</span>
+              <span className="text-2xl font-bold tracking-tight md:text-[28px]">
+                <span className="text-ds-text-primary">Just</span>
+                <span className="text-ds-action">Click</span>
               </span>
             </Link>
           </div>
 
-          {/* center */}
-          <div className="flex flex-wrap items-center justify-start gap-x-10 gap-y-3 md:flex-1 md:justify-center lg:gap-x-12">
+          <div className="flex flex-wrap items-center justify-start gap-x-8 gap-y-3 md:flex-1 md:justify-center">
             <Link
               href="/privacy"
-              className="text-[15px] md:text-base font-medium text-contentColor dark:text-contentColor-dark hover:text-primaryColor dark:hover:text-primaryColor transition-colors"
+              className="text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action rounded-md"
             >
               Privacy
             </Link>
             <Link
               href="/terms"
-              className="text-[15px] md:text-base font-medium text-contentColor dark:text-contentColor-dark hover:text-primaryColor dark:hover:text-primaryColor transition-colors"
+              className="text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action rounded-md"
             >
               Terms
             </Link>
             <Link
               href="/contact"
-              className="text-[15px] md:text-base font-medium text-contentColor dark:text-contentColor-dark hover:text-primaryColor dark:hover:text-primaryColor transition-colors"
+              className="text-sm font-medium text-ds-text-secondary transition-colors hover:text-ds-action focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action rounded-md"
             >
               Contact
             </Link>
           </div>
 
-          {/* right */}
           <div className="flex min-w-0 flex-1 items-center md:justify-end">
-            <p className="text-[15px] md:text-base font-medium text-contentColor dark:text-contentColor-dark">
+            <p className="text-sm font-medium text-ds-text-muted">
               © {currentYear} JustClick
             </p>
           </div>

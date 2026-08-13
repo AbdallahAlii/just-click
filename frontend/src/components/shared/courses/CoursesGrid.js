@@ -6,27 +6,28 @@ const CoursesGrid = ({
   onToggleFavorite,
   onShareMaterial,
 }) => {
+  if (!materials?.length) {
+    return (
+      <p className="py-12 text-center text-sm text-ds-text-muted">
+        No materials found.
+      </p>
+    );
+  }
+
   return (
     <div
-      className={`grid grid-cols-1 ${
-        isNotSidebar
-          ? "sm:grid-cols-2 xl:grid-cols-3"
-          : "sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3"
-      } gap-30px`}
+      className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${
+        isNotSidebar ? "xl:grid-cols-3" : "lg:grid-cols-2 xl:grid-cols-3"
+      }`}
     >
-      {materials?.length ? (
-        materials.map((material) => (
-          <MaterialCard
-            key={material.id}
-            material={material}
-            type="primaryMd"
-            onToggleFavorite={onToggleFavorite}
-            onShareMaterial={onShareMaterial}
-          />
-        ))
-      ) : (
-        <span>No materials found.</span>
-      )}
+      {materials.map((material) => (
+        <MaterialCard
+          key={material.id}
+          material={material}
+          onToggleFavorite={onToggleFavorite}
+          onShareMaterial={onShareMaterial}
+        />
+      ))}
     </div>
   );
 };

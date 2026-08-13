@@ -876,7 +876,7 @@ module.exports = {
       // shadow
       addComponents({
         ".fixed-shadow": {
-          backgroundImage: "linear-gradient(45deg, #F2277E, #5F2DED)",
+          backgroundImage: "linear-gradient(45deg, #0F766E, #115E59)",
 
           position: "fixed",
           top: "200px",
@@ -886,7 +886,7 @@ module.exports = {
           width: "500px",
           height: "500px",
           borderRadius: "1000px",
-          opacity: "0.10",
+          opacity: "0.06",
           filter: "blur(100px)",
         },
       });

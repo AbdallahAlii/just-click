@@ -8,7 +8,6 @@ export default function ProtectedLayout({ children }) {
     <AuthGate>
       <>
         <DashboardHeader />
-        <div className="h-14" />
         {children}
         <Footer />
         <Scrollup />

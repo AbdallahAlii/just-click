@@ -2,43 +2,73 @@
 
 import Link from "next/link";
 
+const variants = {
+  primary:
+    "bg-ds-action text-white border-transparent hover:bg-ds-action-hover shadow-sm",
+  secondary:
+    "bg-ds-surface text-ds-text-primary border-ds-border hover:bg-ds-surface-hover",
+  ghost:
+    "bg-transparent text-ds-text-primary border-transparent hover:bg-ds-surface-hover",
+};
+
+const sizes = {
+  sm: "min-h-10 px-4 text-sm",
+  md: "min-h-11 px-5 text-sm sm:min-h-12 sm:px-6",
+};
+
 const ButtonPrimary = ({
   children,
   color,
+  variant,
   type,
   path,
   arrow,
   width,
   onClick,
   disabled = false,
+  className = "",
+  size = "md",
 }) => {
-  const colorClasses =
-    color === "secondary"
-      ? "bg-secondaryColor border-secondaryColor hover:text-secondaryColor"
-      : "bg-primaryColor border-primaryColor hover:text-primaryColor";
+  const resolvedVariant =
+    variant || (color === "secondary" ? "secondary" : "primary");
 
-  const baseClasses = `inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium text-whiteColor hover:bg-whiteColor dark:hover:bg-whiteColor-dark dark:hover:text-whiteColor transition-colors ${
-    width === "full" ? "w-full" : ""
-  } ${colorClasses}`;
+  const baseClasses = [
+    "inline-flex items-center justify-center gap-2 rounded-xl border font-semibold",
+    "transition-colors duration-200",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action focus-visible:ring-offset-2",
+    "dark:focus-visible:ring-offset-ds-page",
+    "disabled:pointer-events-none disabled:opacity-50",
+    sizes[size] || sizes.md,
+    variants[resolvedVariant] || variants.primary,
+    width === "full" ? "w-full" : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const content = (
+    <>
+      {children}
+      {arrow ? <i className="icofont-long-arrow-right" aria-hidden="true" /> : null}
+    </>
+  );
 
   if (type === "button" || type === "submit") {
     return (
       <button
         type={type === "submit" ? "submit" : "button"}
-        onClick={onClick ? onClick : () => {}}
+        onClick={onClick || undefined}
         disabled={disabled}
-        className={`${baseClasses} ${
-          disabled ? "opacity-50 cursor-not-allowed" : ""
-        }`}
+        className={baseClasses}
       >
-        {children} {arrow && <i className="icofont-long-arrow-right"></i>}
+        {content}
       </button>
     );
   }
 
   return (
-    <Link className={baseClasses} href={path}>
-      {children} {arrow && <i className="icofont-long-arrow-right"></i>}
+    <Link className={baseClasses} href={path || "/"}>
+      {content}
     </Link>
   );
 };

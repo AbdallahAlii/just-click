@@ -2,7 +2,6 @@
 
 import CoursesGrid from "@/components/shared/courses/CoursesGrid";
 import CoursesList from "@/components/shared/courses/CoursesList";
-import NoData from "@/components/shared/others/NoData";
 import {
   useInfiniteMaterialsList,
   useMaterialFilterOptions,
@@ -13,21 +12,32 @@ import {
   mapMaterialToCardModel,
   SORT_TO_API,
 } from "@/features/materials/utils";
-import useIntersectionLoadMore from "@/hooks/useIntersectionLoadMore";
 import { useDebounce } from "@/hooks/dropdown/useDebounce";
-import useTab from "@/hooks/useTab";
+import useIntersectionLoadMore from "@/hooks/useIntersectionLoadMore";
+import {
+  getStoredMaterialsView,
+  saveMaterialsReturnUrl,
+  setStoredMaterialsView,
+} from "@/utils/materialHelpers";
+import {
+  Filter,
+  Heart,
+  LayoutGrid,
+  List,
+  Search,
+  X,
+} from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /* -------------------------------------------------------------------------- */
 /* Constants                                                                  */
 /* -------------------------------------------------------------------------- */
 
-const sortInputs = [
+const SORT_OPTIONS = [
   "Sort by New",
   "Most Viewed",
   "Most Downloaded",
-  "Highest Rated",
   "Title Ascending",
 ];
 
@@ -40,148 +50,83 @@ const MATERIAL_TYPE_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-/* -------------------------------------------------------------------------- */
-/* Skeleton Loaders                                                           */
-/* -------------------------------------------------------------------------- */
+const selectClass =
+  "h-9 w-full appearance-none rounded-lg border border-ds-border bg-ds-surface-input px-2.5 pr-8 text-sm text-ds-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action disabled:cursor-not-allowed disabled:opacity-50";
 
-const GridCardSkeleton = () => (
-  <div className="bg-white dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 animate-pulse">
-    <div className="w-full h-40 bg-gray-100 dark:bg-gray-700/50 rounded-xl mb-4" />
-    <div className="space-y-3">
-      <div className="h-5 bg-gray-100 dark:bg-gray-700/50 rounded w-full" />
-      <div className="h-4 bg-gray-100 dark:bg-gray-700/50 rounded w-2/3" />
-      <div className="h-4 bg-gray-100 dark:bg-gray-700/50 rounded w-1/2" />
-      <div className="flex gap-2 pt-2">
-        <div className="h-6 w-16 bg-gray-100 dark:bg-gray-700/50 rounded-full" />
-        <div className="h-6 w-20 bg-gray-100 dark:bg-gray-700/50 rounded-full" />
-      </div>
-    </div>
-  </div>
-);
+/* -------------------------------------------------------------------------- */
+/* Skeletons                                                                  */
+/* -------------------------------------------------------------------------- */
 
 const ListRowSkeleton = () => (
-  <div className="bg-white dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 animate-pulse flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-    <div className="w-full sm:w-32 h-24 bg-gray-100 dark:bg-gray-700/50 rounded-xl shrink-0" />
-    <div className="flex-1 space-y-3 w-full">
-      <div className="h-5 bg-gray-100 dark:bg-gray-700/50 rounded w-3/4" />
-      <div className="h-4 bg-gray-100 dark:bg-gray-700/50 rounded w-1/2" />
-      <div className="h-4 bg-gray-100 dark:bg-gray-700/50 rounded w-1/3" />
-      <div className="flex gap-2 pt-1">
-        <div className="h-6 w-16 bg-gray-100 dark:bg-gray-700/50 rounded-full" />
-        <div className="h-6 w-20 bg-gray-100 dark:bg-gray-700/50 rounded-full" />
+  <div className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4 animate-pulse">
+    <div className="flex min-w-0 flex-1 items-start gap-2.5 sm:items-center">
+      <div className="h-9 w-9 shrink-0 rounded-lg bg-ds-surface-secondary" />
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="h-3.5 w-3/4 rounded bg-ds-surface-secondary" />
+        <div className="h-3 w-1/2 rounded bg-ds-surface-secondary" />
       </div>
     </div>
-  </div>
-);
-
-const GridSkeleton = ({ count = 6 }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {[...Array(count)].map((_, i) => (
-      <GridCardSkeleton key={i} />
-    ))}
+    <div className="flex items-center gap-2">
+      <div className="h-3 w-14 rounded bg-ds-surface-secondary" />
+      <div className="h-8 w-20 rounded-lg bg-ds-surface-secondary" />
+    </div>
   </div>
 );
 
 const ListSkeleton = ({ count = 5 }) => (
-  <div className="space-y-4">
+  <div className="overflow-hidden rounded-2xl border border-ds-border bg-ds-surface divide-y divide-ds-border">
     {[...Array(count)].map((_, i) => (
       <ListRowSkeleton key={i} />
     ))}
   </div>
 );
 
-/* -------------------------------------------------------------------------- */
-/* Filter Components                                                          */
-/* -------------------------------------------------------------------------- */
-
-const formatCount = (count) => (count < 10 ? `0${count}` : `${count}`);
-
-const FilterChip = ({ label, active, count, onClick, disabled }) => (
-  <button
-    type="button"
-    onClick={!disabled ? onClick : undefined}
-    disabled={disabled}
-    className={`
-      w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm transition-all mb-1
-      ${
-        active
-          ? "bg-ds-action text-white shadow-sm"
-          : "bg-ds-surface text-ds-text-secondary hover:bg-ds-surface-hover border border-ds-border"
-      }
-      ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}
-    `}
-  >
-    <span className="font-medium truncate">{label}</span>
-    {count !== undefined && (
-      <span
-        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-          active
-            ? "bg-ds-surface-elevated text-white"
-            : "bg-ds-surface-secondary text-ds-text-muted"
-        }`}
-      >
-        {formatCount(count)}
-      </span>
-    )}
-  </button>
-);
-
-const FilterSection = ({ title, children, disabled = false, badge }) => (
-  <div className="mb-6">
-    <div className="flex items-center justify-between px-1 mb-3">
-      <span className="text-[10px] font-bold text-ds-text-muted uppercase tracking-widest">
-        {title}
-      </span>
-      {badge && !disabled && (
-        <span className="text-[9px] px-2 py-0.5 bg-ds-action/10 text-ds-action rounded-full font-bold">
-          {badge}
-        </span>
-      )}
+const GridCardSkeleton = () => (
+  <div className="rounded-xl border border-ds-border bg-ds-surface p-3 animate-pulse">
+    <div className="mb-2 flex items-start justify-between">
+      <div className="h-8 w-8 rounded-lg bg-ds-surface-secondary" />
+      <div className="flex gap-1">
+        <div className="h-7 w-7 rounded-md bg-ds-surface-secondary" />
+        <div className="h-7 w-7 rounded-md bg-ds-surface-secondary" />
+      </div>
     </div>
-    <div className={`space-y-1 ${disabled ? "opacity-50" : ""}`}>
-      {children}
+    <div className="mb-1.5 h-3.5 w-full rounded bg-ds-surface-secondary" />
+    <div className="mb-1.5 h-3 w-2/3 rounded bg-ds-surface-secondary" />
+    <div className="mb-2 h-3 w-1/2 rounded bg-ds-surface-secondary" />
+    <div className="flex items-center justify-between border-t border-ds-border pt-2">
+      <div className="h-3 w-14 rounded bg-ds-surface-secondary" />
+      <div className="h-7 w-20 rounded-md bg-ds-surface-secondary" />
     </div>
   </div>
 );
 
-const ViewToggle = ({ currentIdx, onChange }) => (
-  <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
-    <button
-      type="button"
-      onClick={() => onChange(0)}
-      className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${
-        currentIdx === 0
-          ? "bg-ds-surface-hover text-ds-action shadow-sm"
-          : "text-ds-text-muted hover:text-ds-text-secondary"
-      }`}
-      aria-label="Grid view"
-    >
-      <i className="icofont-layout text-lg" />
-    </button>
-
-    <button
-      type="button"
-      onClick={() => onChange(1)}
-      className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all ${
-        currentIdx === 1
-          ? "bg-ds-surface-hover text-ds-action shadow-sm"
-          : "text-ds-text-muted hover:text-ds-text-secondary"
-      }`}
-      aria-label="List view"
-    >
-      <i className="icofont-listine-dots text-lg" />
-    </button>
+const GridSkeleton = ({ count = 6 }) => (
+  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+    {[...Array(count)].map((_, i) => (
+      <GridCardSkeleton key={i} />
+    ))}
   </div>
 );
 
-const MaterialsSidebarFilters = ({
-  mobile = false,
-  currentIdx,
-  onViewChange,
-  searchString,
-  onSearchChange,
-  isSearchPending,
-  isSearchFetching,
+/* -------------------------------------------------------------------------- */
+/* Small UI pieces                                                            */
+/* -------------------------------------------------------------------------- */
+
+const FilterChip = ({ label, onRemove }) => (
+  <span className="inline-flex items-center gap-1.5 rounded-lg border border-ds-border bg-ds-surface px-3 py-1.5 text-xs text-ds-text-secondary">
+    {label}
+    <button
+      type="button"
+      onClick={onRemove}
+      className="rounded text-ds-text-muted transition-colors hover:text-ds-error focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action"
+      aria-label={`Remove ${label}`}
+    >
+      <X className="h-3.5 w-3.5" aria-hidden="true" />
+    </button>
+  </span>
+);
+
+const CascadingFilterFields = ({
   semesters,
   courses,
   chapters,
@@ -192,157 +137,132 @@ const MaterialsSidebarFilters = ({
   onCourseChange,
   onChapterChange,
   isFilterOptionsLoading,
-  isFilterOptionsFetching,
+  idPrefix = "",
 }) => (
-  <div className="space-y-4">
-    {mobile && (
-      <FilterSection title="View">
-        <ViewToggle currentIdx={currentIdx} onChange={onViewChange} />
-      </FilterSection>
-    )}
-
-    <FilterSection title="Search">
-      <div className="relative group">
-        <input
-          type="text"
-          placeholder="Search materials..."
-          value={searchString}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full px-4 py-3 pl-10 pr-10 bg-ds-surface-input border border-ds-border rounded-xl text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-focus transition-all text-ds-text-primary placeholder:text-ds-text-muted"
-        />
-        <i className="icofont-search-1 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primaryColor transition-colors" />
-        {(isSearchPending || isSearchFetching) && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-primaryColor/30 border-t-primaryColor rounded-full animate-spin" />
-        )}
-      </div>
-    </FilterSection>
-
-    <FilterSection
-      title="Semester"
-      badge={semesters.length ? `${semesters.length}` : undefined}
-    >
-      {isFilterOptionsLoading ? (
-        <div className="space-y-2">
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="h-11 rounded-xl bg-gray-100 dark:bg-gray-800/60 animate-pulse"
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+  <>
+    <div>
+      <label
+        htmlFor={`${idPrefix}semester`}
+        className="mb-1 block text-[11px] font-medium text-ds-text-muted"
+      >
+        Semester
+      </label>
+      <div className="relative">
+        <select
+          id={`${idPrefix}semester`}
+          value={selectedSemester ?? ""}
+          onChange={(e) =>
+            onSemesterChange(e.target.value ? Number(e.target.value) : null)
+          }
+          disabled={isFilterOptionsLoading}
+          className={selectClass}
+        >
+          <option value="">All semesters</option>
           {semesters.map((sem) => (
-            <FilterChip
-              key={sem.id}
-              label={sem.label}
-              count={sem.count}
-              active={selectedSemester === sem.id}
-              onClick={() => onSemesterChange(sem.id)}
-            />
+            <option key={sem.id} value={sem.id}>
+              {sem.label}
+              {sem.count != null ? ` (${sem.count})` : ""}
+            </option>
           ))}
-        </div>
-      )}
-    </FilterSection>
+        </select>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ds-text-muted text-xs">
+          ▾
+        </span>
+      </div>
+    </div>
 
-    <FilterSection
-      title="Course"
-      disabled={!selectedSemester}
-      badge={courses.length ? `${courses.length}` : undefined}
-    >
-      {!selectedSemester ? (
-        <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
-          Select a semester first
-        </div>
-      ) : isFilterOptionsFetching ? (
-        <div className="space-y-2">
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className="h-11 rounded-xl bg-gray-100 dark:bg-gray-800/60 animate-pulse"
-            />
+    <div>
+      <label
+        htmlFor={`${idPrefix}course`}
+        className="mb-1 block text-[11px] font-medium text-ds-text-muted"
+      >
+        Course
+      </label>
+      <div className="relative">
+        <select
+          id={`${idPrefix}course`}
+          value={selectedCourse ?? ""}
+          onChange={(e) =>
+            onCourseChange(e.target.value ? Number(e.target.value) : null)
+          }
+          disabled={!selectedSemester}
+          className={selectClass}
+        >
+          <option value="">
+            {selectedSemester ? "All courses" : "Select semester first"}
+          </option>
+          {courses.map((course) => (
+            <option key={course.id} value={course.id}>
+              {course.label}
+              {course.count != null ? ` (${course.count})` : ""}
+            </option>
           ))}
-        </div>
-      ) : (
-        <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-          {courses.length ? (
-            courses.map((course) => (
-              <FilterChip
-                key={course.id}
-                label={course.label}
-                count={course.count}
-                active={selectedCourse === course.id}
-                onClick={() => onCourseChange(course.id)}
-              />
-            ))
-          ) : (
-            <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
-              No courses found
-            </div>
-          )}
-        </div>
-      )}
-    </FilterSection>
+        </select>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ds-text-muted text-xs">
+          ▾
+        </span>
+      </div>
+    </div>
 
-    <FilterSection
-      title="Chapter"
-      disabled={!selectedCourse}
-      badge={chapters.length ? `${chapters.length}` : undefined}
-    >
-      {!selectedCourse ? (
-        <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
-          Select a course first
-        </div>
-      ) : isFilterOptionsFetching ? (
-        <div className="space-y-2">
-          {[...Array(3)].map((_, i) => (
-            <div
-              key={i}
-              className="h-11 rounded-xl bg-gray-100 dark:bg-gray-800/60 animate-pulse"
-            />
+    <div>
+      <label
+        htmlFor={`${idPrefix}chapter`}
+        className="mb-1 block text-[11px] font-medium text-ds-text-muted"
+      >
+        Chapter
+      </label>
+      <div className="relative">
+        <select
+          id={`${idPrefix}chapter`}
+          value={selectedChapter ?? ""}
+          onChange={(e) =>
+            onChapterChange(e.target.value ? Number(e.target.value) : null)
+          }
+          disabled={!selectedCourse}
+          className={selectClass}
+        >
+          <option value="">
+            {selectedCourse ? "All chapters" : "Select course first"}
+          </option>
+          {chapters.map((chapter) => (
+            <option key={chapter.id} value={chapter.id}>
+              {chapter.label}
+              {chapter.count != null ? ` (${chapter.count})` : ""}
+            </option>
           ))}
-        </div>
-      ) : (
-        <div className="max-h-48 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-          {chapters.length ? (
-            chapters.map((chapter) => (
-              <FilterChip
-                key={chapter.id}
-                label={chapter.label}
-                count={chapter.count}
-                active={selectedChapter === chapter.id}
-                onClick={() => onChapterChange(chapter.id)}
-              />
-            ))
-          ) : (
-            <div className="text-center py-4 text-xs font-medium text-gray-400 bg-white/50 dark:bg-gray-800/30 rounded-xl border-2 border-dashed border-gray-100 dark:border-gray-700/50">
-              No chapters found
-            </div>
-          )}
-        </div>
-      )}
-    </FilterSection>
-  </div>
+        </select>
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ds-text-muted text-xs">
+          ▾
+        </span>
+      </div>
+    </div>
+  </>
 );
 
 /* -------------------------------------------------------------------------- */
-/* Main Component                                                             */
+/* Main                                                                       */
 /* -------------------------------------------------------------------------- */
 
 const CoursesPrimary = ({ isNotSidebar, isList }) => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { currentIdx, setCurrentIdx } = useTab();
-
   const favoriteMutation = useToggleMaterialFavorite();
+  const lastUrlRef = useRef("");
 
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [favoriteOverrides, setFavoriteOverrides] = useState({});
+
+  const [viewMode, setViewMode] = useState(() => {
+    if (isList) return "list";
+    const fromUrl = searchParams.get("view");
+    if (fromUrl === "grid" || fromUrl === "list") return fromUrl;
+    return getStoredMaterialsView();
+  });
+
   const [favoriteOnly, setFavoriteOnly] = useState(
     searchParams.get("favorite") === "true",
   );
-
   const [selectedSemester, setSelectedSemester] = useState(
     searchParams.get("sem") ? Number(searchParams.get("sem")) : null,
   );
@@ -353,46 +273,37 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     searchParams.get("ch") ? Number(searchParams.get("ch")) : null,
   );
   const [searchString, setSearchString] = useState(searchParams.get("q") || "");
-  const debouncedSearch = useDebounce(searchString, 500);
+  const debouncedSearch = useDebounce(searchString, 300);
   const [selectedMaterialType, setSelectedMaterialType] = useState(
     searchParams.get("type") || "",
   );
-  const [sortInput, setSortInput] = useState(
-    searchParams.get("sort") || "Sort by New",
-  );
+  const [sortInput, setSortInput] = useState(() => {
+    const fromUrl = searchParams.get("sort");
+    if (fromUrl && SORT_OPTIONS.includes(fromUrl)) return fromUrl;
+    return "Sort by New";
+  });
 
   useEffect(() => {
-    if (isList) setCurrentIdx(1);
-  }, [isList, setCurrentIdx]);
-
-  const updateURL = useCallback(
-    (updates) => {
-      const params = new URLSearchParams(searchParams.toString());
-
-      Object.entries(updates).forEach(([k, v]) => {
-        if (v === null || v === undefined || v === "") {
-          params.delete(k);
-        } else {
-          params.set(k, String(v));
-        }
-      });
-
-      const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [pathname, router, searchParams],
-  );
+    if (isList) setViewMode("list");
+  }, [isList]);
 
   useEffect(() => {
-    updateURL({
-      sem: selectedSemester,
-      course: selectedCourse,
-      ch: selectedChapter,
-      q: debouncedSearch || null,
-      type: selectedMaterialType || null,
-      sort: sortInput !== "Sort by New" ? sortInput : null,
-      favorite: favoriteOnly ? "true" : null,
-    });
+    if (!isList) setStoredMaterialsView(viewMode);
+  }, [viewMode, isList]);
+
+  const buildQueryString = useCallback(() => {
+    const params = new URLSearchParams();
+
+    if (selectedSemester != null) params.set("sem", String(selectedSemester));
+    if (selectedCourse != null) params.set("course", String(selectedCourse));
+    if (selectedChapter != null) params.set("ch", String(selectedChapter));
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (selectedMaterialType) params.set("type", selectedMaterialType);
+    if (sortInput && sortInput !== "Sort by New") params.set("sort", sortInput);
+    if (favoriteOnly) params.set("favorite", "true");
+    if (viewMode && viewMode !== "list") params.set("view", viewMode);
+
+    return params.toString();
   }, [
     selectedSemester,
     selectedCourse,
@@ -401,28 +312,34 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     selectedMaterialType,
     sortInput,
     favoriteOnly,
-    updateURL,
+    viewMode,
   ]);
+
+  useEffect(() => {
+    const qs = buildQueryString();
+    const nextUrl = qs ? `${pathname}?${qs}` : pathname;
+    saveMaterialsReturnUrl(nextUrl);
+
+    if (qs === searchParams.toString() || lastUrlRef.current === nextUrl) {
+      lastUrlRef.current = nextUrl;
+      return;
+    }
+
+    lastUrlRef.current = nextUrl;
+    router.replace(nextUrl, { scroll: false });
+  }, [buildQueryString, pathname, router, searchParams]);
 
   const filterOptionsParams = useMemo(
     () => ({
       semester_id: selectedSemester || undefined,
       course_id: selectedCourse || undefined,
-      chapter_id: selectedChapter || undefined,
-      material_type: selectedMaterialType || undefined,
     }),
-    [
-      selectedSemester,
-      selectedCourse,
-      selectedChapter,
-      selectedMaterialType,
-    ],
+    [selectedSemester, selectedCourse],
   );
 
   const {
     data: filterOptionsResponse,
     isLoading: isFilterOptionsLoading,
-    isFetching: isFilterOptionsFetching,
   } = useMaterialFilterOptions(filterOptionsParams, {
     staleTime: 1000 * 60 * 5,
   });
@@ -434,7 +351,7 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
   const materialsParams = useMemo(
     () => ({
       mode: "cursor",
-      limit: 10,
+      limit: 20,
       semester_id: selectedSemester || undefined,
       course_id: selectedCourse || undefined,
       chapter_id: selectedChapter || undefined,
@@ -472,13 +389,12 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
   const materials = useMemo(() => {
     const raw = flattenInfiniteMaterials(data?.pages || []);
 
-    const mapped = raw.map((item) => {
+    return raw.map((item) => {
       const base = mapMaterialToCardModel(item);
-
       const apiIsFavorite =
         item?.user_state?.is_favorite ??
         item?.is_favorite ??
-        base?.isFavorite ??
+        base?.userState?.isFavorite ??
         false;
 
       const finalIsFavorite =
@@ -494,13 +410,7 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
         rawItem: item,
       };
     });
-
-    const visibleMaterials = favoriteOnly
-      ? mapped.filter((item) => item.isFavorite)
-      : mapped;
-
-    return visibleMaterials;
-  }, [data?.pages, favoriteOverrides, favoriteOnly]);
+  }, [data?.pages, favoriteOverrides]);
 
   const totalCount =
     data?.pages?.[0]?.data?.meta?.total_count ??
@@ -524,26 +434,25 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     favoriteOnly ? "favorite" : null,
   ].filter(Boolean).length;
 
-  const isSearchPending = searchString !== debouncedSearch;
-  const isSearchFetching = isFetching && !isFetchingNextPage;
-  const isInitialLoading = isLoading && !(data?.pages?.length);
+  const isInitialLoading = isLoading && !data?.pages?.length;
+  const hasExistingData = !!data?.pages?.length;
+  const showUpdating =
+    isFetching && !isFetchingNextPage && !isInitialLoading && hasExistingData;
+  const isListView = isList || viewMode === "list";
 
   const handleSemesterChange = (semId) => {
-    const nextValue = selectedSemester === semId ? null : semId;
-    setSelectedSemester(nextValue);
+    setSelectedSemester(semId);
     setSelectedCourse(null);
     setSelectedChapter(null);
   };
 
   const handleCourseChange = (courseId) => {
-    const nextValue = selectedCourse === courseId ? null : courseId;
-    setSelectedCourse(nextValue);
+    setSelectedCourse(courseId);
     setSelectedChapter(null);
   };
 
   const handleChapterChange = (chapterId) => {
-    const nextValue = selectedChapter === chapterId ? null : chapterId;
-    setSelectedChapter(nextValue);
+    setSelectedChapter(chapterId);
   };
 
   const clearAll = () => {
@@ -555,15 +464,11 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     setSortInput("Sort by New");
     setFavoriteOnly(false);
     setIsMobileFilterOpen(false);
-    router.replace(pathname, { scroll: false });
   };
 
-  const handleViewChange = (idx) => {
-    setCurrentIdx(idx);
-  };
-
-  const handleToggleFavoriteFilter = () => {
-    setFavoriteOnly((prev) => !prev);
+  const handleViewChange = (next) => {
+    if (isList) return;
+    setViewMode(next);
   };
 
   const handleToggleFavorite = useCallback(
@@ -608,7 +513,6 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
       typeof window !== "undefined"
         ? `${window.location.origin}/materials/${material.id}`
         : "";
-
     if (!shareUrl) return;
 
     const shareText = `New material uploaded: ${
@@ -623,16 +527,20 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
           url: shareUrl,
         })
         .catch(() => {
-          const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(
-            shareText,
-          )}`;
-          window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+          window.open(
+            `https://wa.me/?text=${encodeURIComponent(shareText)}`,
+            "_blank",
+            "noopener,noreferrer",
+          );
         });
       return;
     }
 
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(shareText)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   }, []);
 
   const loadMoreRef = useIntersectionLoadMore({
@@ -642,13 +550,7 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     onLoadMore: fetchNextPage,
   });
 
-  const sidebarProps = {
-    currentIdx,
-    onViewChange: handleViewChange,
-    searchString,
-    onSearchChange: setSearchString,
-    isSearchPending,
-    isSearchFetching,
+  const cascadingProps = {
     semesters,
     courses,
     chapters,
@@ -659,331 +561,417 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
     onCourseChange: handleCourseChange,
     onChapterChange: handleChapterChange,
     isFilterOptionsLoading,
-    isFilterOptionsFetching,
   };
 
   return (
-    <div className="bg-gray-50/50 dark:bg-ds-page min-h-screen">
-      <div className="container py-6 md:py-8 lg:py-10">
-        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-5 bg-transparent">
+    <div className="min-h-screen bg-ds-page">
+      <div className="container py-5 md:py-6 lg:py-8">
+        {/* Header */}
+        <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-ds-text-primary tracking-tight">
+            <h1 className="text-xl font-bold tracking-tight text-ds-text-primary sm:text-2xl">
               Study Materials
             </h1>
-            <div className="flex items-center gap-3 mt-2">
-              <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-md bg-ds-surface-secondary text-xs font-semibold text-ds-text-secondary">
-                {totalCount} {totalCount === 1 ? "Result" : "Results"}
-              </span>
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={clearAll}
-                  className="text-[11px] font-bold text-gray-400 hover:text-red-500 uppercase tracking-wider transition-colors"
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
+            <p className="mt-0.5 text-sm text-ds-text-secondary">
+              Browse notes, slides, and course files in one place.
+            </p>
+          </div>
+          <span className="inline-flex w-fit items-center rounded-md bg-ds-surface-secondary px-2 py-0.5 text-xs font-semibold text-ds-text-secondary">
+            {totalCount} {totalCount === 1 ? "result" : "results"}
+          </span>
+        </div>
+
+        {/* Toolbar */}
+        <div className="mb-4 space-y-2.5">
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ds-text-muted"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              placeholder="Search materials..."
+              value={searchString}
+              onChange={(e) => setSearchString(e.target.value)}
+              className="h-9 w-full rounded-lg border border-ds-border bg-ds-surface-input py-2 pl-9 pr-3 text-sm text-ds-text-primary placeholder:text-ds-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action"
+              aria-label="Search materials"
+            />
           </div>
 
-          <div className="flex items-center flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleToggleFavoriteFilter}
-              className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
-                favoriteOnly
-                  ? "bg-red-50 dark:bg-red-500/10 text-red-500 border-red-200 dark:border-red-500/20"
-                  : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-100 dark:border-gray-700 hover:text-red-500 hover:border-red-200 dark:hover:border-red-500/20"
-              }`}
-            >
-              <span className="inline-flex items-center gap-2">
-                <i className="icofont-heart-alt" />
-                My Favorites
-              </span>
-            </button>
+          <div className="hidden grid-cols-2 gap-2 md:grid lg:grid-cols-5">
+            <CascadingFilterFields {...cascadingProps} idPrefix="desk-" />
 
-            <button
-              type="button"
-              onClick={() => setIsMobileFilterOpen(true)}
-              className="lg:hidden flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 text-sm font-medium shadow-sm hover:shadow-md transition-all"
-            >
-              <i className="icofont-filter text-primaryColor" />
-              <span className="text-gray-700 dark:text-gray-200">Filters</span>
-              {activeFilterCount > 0 && (
-                <span className="w-5 h-5 bg-primaryColor text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-
-            <div className="flex bg-ds-surface p-1 rounded-xl shadow-sm border border-ds-border">
-              <div className="hidden lg:flex items-center gap-1 border-r border-gray-100 dark:border-gray-700 pr-2 mr-2">
-                <ViewToggle
-                  currentIdx={currentIdx}
-                  onChange={handleViewChange}
-                />
-              </div>
-
-              <div className="relative flex items-center h-9 px-1 border-r border-gray-100 dark:border-gray-700 pr-2 mr-2">
+            <div>
+              <label
+                htmlFor="desk-type"
+                className="mb-1 block text-[11px] font-medium text-ds-text-muted"
+              >
+                Type
+              </label>
+              <div className="relative">
                 <select
+                  id="desk-type"
                   value={selectedMaterialType}
                   onChange={(e) => setSelectedMaterialType(e.target.value)}
-                  className="appearance-none text-sm font-medium bg-transparent text-gray-700 dark:text-gray-300 pl-3 pr-8 focus:outline-none cursor-pointer min-w-[120px]"
-                  aria-label="Filter by material type"
+                  className={selectClass}
                 >
-                  <option value="" className="dark:bg-gray-800">
-                    All types
-                  </option>
+                  <option value="">All types</option>
                   {MATERIAL_TYPE_OPTIONS.map((opt) => (
-                    <option
-                      key={opt.value}
-                      value={opt.value}
-                      className="dark:bg-gray-800"
-                    >
+                    <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
                   ))}
                 </select>
-                <i className="icofont-rounded-down absolute right-3 text-gray-400 pointer-events-none text-sm" />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ds-text-muted text-xs">
+                  ▾
+                </span>
               </div>
+            </div>
 
-              <div className="relative flex items-center h-9 px-1">
+            <div>
+              <label
+                htmlFor="desk-sort"
+                className="mb-1 block text-[11px] font-medium text-ds-text-muted"
+              >
+                Sort
+              </label>
+              <div className="relative">
                 <select
+                  id="desk-sort"
                   value={sortInput}
                   onChange={(e) => setSortInput(e.target.value)}
-                  className="appearance-none text-sm font-medium bg-transparent text-gray-700 dark:text-gray-300 pl-3 pr-8 focus:outline-none cursor-pointer"
+                  className={selectClass}
                 >
-                  {sortInputs.map((s) => (
-                    <option key={s} value={s} className="dark:bg-gray-800">
+                  {SORT_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
                       {s}
                     </option>
                   ))}
                 </select>
-                <i className="icofont-rounded-down absolute right-3 text-gray-400 pointer-events-none text-sm" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {hasActiveFilters && (
-          <div className="flex flex-wrap gap-2 mb-6">
-            {favoriteOnly && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm text-xs text-gray-700 dark:text-gray-300">
-                Favorites
-                <button
-                  type="button"
-                  onClick={() => setFavoriteOnly(false)}
-                  className="ml-1 text-gray-400 hover:text-red-500"
-                >
-                  <i className="icofont-close-line text-sm" />
-                </button>
-              </span>
-            )}
-
-            {selectedSemester && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm text-xs text-gray-700 dark:text-gray-300">
-                <span className="font-semibold text-primaryColor">
-                  Semester
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ds-text-muted text-xs">
+                  ▾
                 </span>
-                {semesters.find((s) => s.id === selectedSemester)?.label ||
-                  selectedSemester}
-                <button
-                  type="button"
-                  onClick={() => handleSemesterChange(selectedSemester)}
-                  className="ml-1 text-gray-400 hover:text-red-500"
-                >
-                  <i className="icofont-close-line text-sm" />
-                </button>
-              </span>
-            )}
-
-            {selectedCourse && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm text-xs text-gray-700 dark:text-gray-300">
-                {courses.find((c) => c.id === selectedCourse)?.label ||
-                  selectedCourse}
-                <button
-                  type="button"
-                  onClick={() => handleCourseChange(selectedCourse)}
-                  className="ml-1 text-gray-400 hover:text-red-500"
-                >
-                  <i className="icofont-close-line text-sm" />
-                </button>
-              </span>
-            )}
-
-            {selectedChapter && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm text-xs text-gray-700 dark:text-gray-300">
-                {chapters.find((c) => c.id === selectedChapter)?.label ||
-                  selectedChapter}
-                <button
-                  type="button"
-                  onClick={() => handleChapterChange(selectedChapter)}
-                  className="ml-1 text-gray-400 hover:text-red-500"
-                >
-                  <i className="icofont-close-line text-sm" />
-                </button>
-              </span>
-            )}
-
-            {searchString && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm text-xs text-gray-700 dark:text-gray-300">
-                {searchString}
-                <button
-                  type="button"
-                  onClick={() => setSearchString("")}
-                  className="ml-1 text-gray-400 hover:text-red-500"
-                >
-                  <i className="icofont-close-line text-sm" />
-                </button>
-              </span>
-            )}
-
-            {selectedMaterialType && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm text-xs text-gray-700 dark:text-gray-300">
-                <span className="font-semibold text-primaryColor">Type</span>
-                {MATERIAL_TYPE_OPTIONS.find((o) => o.value === selectedMaterialType)
-                  ?.label || selectedMaterialType}
-                <button
-                  type="button"
-                  onClick={() => setSelectedMaterialType("")}
-                  className="ml-1 text-gray-400 hover:text-red-500"
-                >
-                  <i className="icofont-close-line text-sm" />
-                </button>
-              </span>
-            )}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <aside className="hidden lg:block lg:col-span-3">
-            <div className="sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto pr-2 custom-scrollbar">
-              <MaterialsSidebarFilters {...sidebarProps} />
+              </div>
             </div>
-          </aside>
+          </div>
 
-          <main className="lg:col-span-9">
-            {isInitialLoading ? (
-              currentIdx === 0 ? (
-                <GridSkeleton />
-              ) : (
-                <ListSkeleton />
-              )
-            ) : materials.length > 0 ? (
-              <div className="space-y-8">
-                <div className="tab-contents">
-                  {currentIdx === 0 ? (
-                    <CoursesGrid
-                      isNotSidebar={isNotSidebar}
-                      materials={materials}
-                      onToggleFavorite={handleToggleFavorite}
-                      onShareMaterial={handleShareMaterial}
-                    />
-                  ) : (
-                    <CoursesList
-                      materials={materials}
-                      onToggleFavorite={handleToggleFavorite}
-                      onShareMaterial={handleShareMaterial}
-                    />
-                  )}
-                </div>
-
-                <div ref={loadMoreRef} className="h-2 w-full" />
-
-                {isFetchingNextPage &&
-                  (currentIdx === 0 ? (
-                    <GridSkeleton count={3} />
-                  ) : (
-                    <ListSkeleton count={3} />
+          {/* Mobile type + sort */}
+          <div className="grid grid-cols-2 gap-2 md:hidden">
+            <div>
+              <label
+                htmlFor="mob-type"
+                className="mb-1 block text-[11px] font-medium text-ds-text-muted"
+              >
+                Type
+              </label>
+              <div className="relative">
+                <select
+                  id="mob-type"
+                  value={selectedMaterialType}
+                  onChange={(e) => setSelectedMaterialType(e.target.value)}
+                  className={selectClass}
+                >
+                  <option value="">All types</option>
+                  {MATERIAL_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
                   ))}
-
-                {!hasNextPage && materials.length > 0 && (
-                  <div className="text-center text-sm text-gray-400 py-6">
-                    You have reached the end.
-                  </div>
-                )}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ds-text-muted text-xs">
+                  ▾
+                </span>
               </div>
-            ) : (
-              <NoData
-                message={
-                  favoriteOnly
-                    ? "No favorite materials found."
-                    : "No materials found matching your filters."
-                }
+            </div>
+            <div>
+              <label
+                htmlFor="mob-sort"
+                className="mb-1 block text-[11px] font-medium text-ds-text-muted"
+              >
+                Sort
+              </label>
+              <div className="relative">
+                <select
+                  id="mob-sort"
+                  value={sortInput}
+                  onChange={(e) => setSortInput(e.target.value)}
+                  className={selectClass}
+                >
+                  {SORT_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ds-text-muted text-xs">
+                  ▾
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFavoriteOnly((prev) => !prev)}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action ${
+                favoriteOnly
+                  ? "border-ds-error/30 bg-ds-error/10 text-ds-error"
+                  : "border-ds-border bg-ds-surface text-ds-text-secondary hover:bg-ds-surface-hover"
+              }`}
+              aria-pressed={favoriteOnly}
+            >
+              <Heart
+                className={`h-4 w-4 ${favoriteOnly ? "fill-current" : ""}`}
+                aria-hidden="true"
               />
-            )}
+              Favorites
+            </button>
 
-            {isSearchFetching && !isInitialLoading && (
-              <div className="mt-4 flex items-center gap-2 text-xs text-gray-400">
-                <span className="w-3 h-3 border-2 border-primaryColor/30 border-t-primaryColor rounded-full animate-spin" />
-                Updating results...
+            {!isList ? (
+              <div
+                className="inline-flex rounded-lg border border-ds-border bg-ds-surface p-0.5"
+                role="group"
+                aria-label="View mode"
+              >
+                <button
+                  type="button"
+                  onClick={() => handleViewChange("list")}
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action ${
+                    isListView
+                      ? "bg-ds-action/10 text-ds-action"
+                      : "text-ds-text-muted hover:text-ds-text-secondary"
+                  }`}
+                  aria-label="List view"
+                  aria-pressed={isListView}
+                >
+                  <List className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleViewChange("grid")}
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action ${
+                    !isListView
+                      ? "bg-ds-action/10 text-ds-action"
+                      : "text-ds-text-muted hover:text-ds-text-secondary"
+                  }`}
+                  aria-label="Grid view"
+                  aria-pressed={!isListView}
+                >
+                  <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                </button>
               </div>
-            )}
-          </main>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setIsMobileFilterOpen(true)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ds-border bg-ds-surface px-3 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action md:hidden"
+            >
+              <Filter className="h-4 w-4 text-ds-action" aria-hidden="true" />
+              Filters
+              {activeFilterCount > 0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-ds-action px-1.5 text-[10px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+
+            {showUpdating ? (
+              <span className="ml-auto text-xs text-ds-text-muted">
+                Updating…
+              </span>
+            ) : null}
+          </div>
+
+          {hasActiveFilters ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {favoriteOnly ? (
+                <FilterChip
+                  label="Favorites"
+                  onRemove={() => setFavoriteOnly(false)}
+                />
+              ) : null}
+              {selectedSemester ? (
+                <FilterChip
+                  label={
+                    semesters.find((s) => s.id === selectedSemester)?.label ||
+                    `Semester ${selectedSemester}`
+                  }
+                  onRemove={() => handleSemesterChange(null)}
+                />
+              ) : null}
+              {selectedCourse ? (
+                <FilterChip
+                  label={
+                    courses.find((c) => c.id === selectedCourse)?.label ||
+                    "Course"
+                  }
+                  onRemove={() => handleCourseChange(null)}
+                />
+              ) : null}
+              {selectedChapter ? (
+                <FilterChip
+                  label={
+                    chapters.find((c) => c.id === selectedChapter)?.label ||
+                    "Chapter"
+                  }
+                  onRemove={() => handleChapterChange(null)}
+                />
+              ) : null}
+              {selectedMaterialType ? (
+                <FilterChip
+                  label={
+                    MATERIAL_TYPE_OPTIONS.find(
+                      (o) => o.value === selectedMaterialType,
+                    )?.label || selectedMaterialType
+                  }
+                  onRemove={() => setSelectedMaterialType("")}
+                />
+              ) : null}
+              {debouncedSearch ? (
+                <FilterChip
+                  label={`“${debouncedSearch}”`}
+                  onRemove={() => setSearchString("")}
+                />
+              ) : null}
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-xs font-medium text-ds-text-muted transition-colors hover:text-ds-error focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action rounded"
+              >
+                Clear all
+              </button>
+            </div>
+          ) : null}
         </div>
+
+        {/* Results */}
+        <main>
+          {isInitialLoading ? (
+            isListView ? (
+              <ListSkeleton />
+            ) : (
+              <GridSkeleton />
+            )
+          ) : materials.length > 0 ? (
+            <div className="space-y-6">
+              {isListView ? (
+                <CoursesList
+                  materials={materials}
+                  onToggleFavorite={handleToggleFavorite}
+                  onShareMaterial={handleShareMaterial}
+                />
+              ) : (
+                <CoursesGrid
+                  isNotSidebar={isNotSidebar !== false}
+                  materials={materials}
+                  onToggleFavorite={handleToggleFavorite}
+                  onShareMaterial={handleShareMaterial}
+                />
+              )}
+
+              <div ref={loadMoreRef} className="h-2 w-full" />
+
+              {isFetchingNextPage
+                ? isListView
+                  ? <ListSkeleton count={3} />
+                  : <GridSkeleton count={3} />
+                : null}
+
+              {!hasNextPage && materials.length > 0 ? (
+                <p className="py-4 text-center text-sm text-ds-text-muted">
+                  You’ve reached the end.
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-ds-border bg-ds-surface px-6 py-20 text-center">
+              <p className="text-base font-medium text-ds-text-primary">
+                {favoriteOnly
+                  ? "No favorites yet"
+                  : "No materials found"}
+              </p>
+              <p className="mt-2 text-sm text-ds-text-muted">
+                {favoriteOnly
+                  ? "Save materials with the heart icon to see them here."
+                  : "Try adjusting your search or filters."}
+              </p>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="mt-5 inline-flex items-center rounded-xl border border-ds-border bg-ds-surface-secondary px-4 py-2 text-sm font-medium text-ds-text-secondary transition-colors hover:bg-ds-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action"
+                >
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
+          )}
+        </main>
       </div>
 
+      {/* Mobile filters sheet */}
       <div
-        className={`fixed inset-0 z-50 lg:hidden transition-all duration-300 ${
-          isMobileFilterOpen ? "visible" : "invisible"
+        className={`fixed inset-0 z-50 md:hidden ${
+          isMobileFilterOpen ? "pointer-events-auto" : "pointer-events-none"
         }`}
+        aria-hidden={!isMobileFilterOpen}
       >
-        <div
-          className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${
+        <button
+          type="button"
+          className={`absolute inset-0 bg-black/40 transition-opacity ${
             isMobileFilterOpen ? "opacity-100" : "opacity-0"
           }`}
           onClick={() => setIsMobileFilterOpen(false)}
+          aria-label="Close filters"
         />
         <div
-          className={`absolute right-0 top-0 h-full w-[85%] max-w-[360px] bg-gray-50 dark:bg-gray-900 shadow-2xl transform transition-transform duration-300 ease-out ${
-            isMobileFilterOpen ? "translate-x-0" : "translate-x-full"
+          className={`absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border-t border-ds-border bg-ds-surface p-5 shadow-xl transition-transform duration-300 ${
+            isMobileFilterOpen ? "translate-y-0" : "translate-y-full"
           }`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="mobile-filters-title"
         >
-          <div className="sticky top-0 flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-            <div className="flex items-center gap-2">
-              <i className="icofont-filter text-primaryColor" />
-              <h3 className="font-bold text-gray-900 dark:text-white">
-                Filters
-              </h3>
-            </div>
+          <div className="mb-4 flex items-center justify-between">
+            <h2
+              id="mobile-filters-title"
+              className="text-base font-semibold text-ds-text-primary"
+            >
+              Filters
+            </h2>
             <button
               type="button"
               onClick={() => setIsMobileFilterOpen(false)}
-              className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-ds-text-muted hover:bg-ds-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action"
+              aria-label="Close filters"
             >
-              <i className="icofont-close" />
+              <X className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
 
-          <div className="p-5 overflow-y-auto h-[calc(100%-73px)]">
-            <div className="mb-4">
-              <button
-                type="button"
-                onClick={handleToggleFavoriteFilter}
-                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
-                  favoriteOnly
-                    ? "bg-red-50 dark:bg-red-500/10 text-red-500 border-red-200 dark:border-red-500/20"
-                    : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-100 dark:border-gray-700"
-                }`}
-              >
-                <i className="icofont-heart-alt" />
-                <span>My Favorites</span>
-              </button>
-            </div>
+          <div className="space-y-3">
+            <CascadingFilterFields {...cascadingProps} idPrefix="mob-" />
+          </div>
 
-            <MaterialsSidebarFilters {...sidebarProps} mobile />
-            {hasActiveFilters && (
+          <div className="mt-6 flex gap-2">
+            {hasActiveFilters ? (
               <button
                 type="button"
-                onClick={() => {
-                  clearAll();
-                  setIsMobileFilterOpen(false);
-                }}
-                className="w-full mt-8 py-3 bg-red-50 dark:bg-red-500/10 text-red-500 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-xl text-sm font-bold transition-colors"
+                onClick={clearAll}
+                className="flex-1 rounded-xl border border-ds-border px-4 py-2.5 text-sm font-medium text-ds-text-secondary hover:bg-ds-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action"
               >
-                Clear All Filters
+                Clear all
               </button>
-            )}
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setIsMobileFilterOpen(false)}
+              className="flex-1 rounded-xl bg-ds-action px-4 py-2.5 text-sm font-semibold text-white hover:bg-ds-action-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-action"
+            >
+              Show results
+            </button>
           </div>
         </div>
       </div>

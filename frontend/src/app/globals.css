@@ -60,21 +60,21 @@
   --lightGrey4: #a2a9b6;
   --borderColor2: #dddddd;
 
-  /* Semantic theme tokens — light mode (unchanged from original template) */
-  --ds-page: #fbfbfb;
+  /* Semantic theme tokens — calm teal SaaS system */
+  --ds-page: #f8fafc;
   --ds-surface: #ffffff;
-  --ds-surface-secondary: #f7f7f7;
+  --ds-surface-secondary: #f1f5f9;
   --ds-surface-elevated: #ffffff;
-  --ds-surface-hover: #f7f7f7;
+  --ds-surface-hover: #f1f5f9;
   --ds-surface-input: #ffffff;
-  --ds-text-primary: #222222;
-  --ds-text-secondary: #5f6c76;
-  --ds-text-muted: #7b8696;
-  --ds-border: #eeeeee;
-  --ds-border-subtle: #f0f0f5;
-  --ds-action: #5f2ded;
-  --ds-action-hover: #4f24c8;
-  --ds-focus: rgba(95, 45, 237, 0.35);
+  --ds-text-primary: #0f172a;
+  --ds-text-secondary: #475569;
+  --ds-text-muted: #64748b;
+  --ds-border: #e2e8f0;
+  --ds-border-subtle: #f1f5f9;
+  --ds-action: #0f766e;
+  --ds-action-hover: #115e59;
+  --ds-focus: rgba(15, 118, 110, 0.35);
   --ds-success: #16a34a;
   --ds-warning: #d97706;
   --ds-error: #dc2626;
@@ -86,24 +86,24 @@
   --borderColor2: #3d4452;
   color-scheme: dark;
 
-  /* Softer dark mode — warm gray, not blue-black */
-  --ds-page: #23272f;
-  --ds-surface-secondary: #2a2f38;
-  --ds-surface: #2f343e;
-  --ds-surface-elevated: #383e4a;
-  --ds-surface-hover: #3d4452;
-  --ds-surface-input: #2a2f38;
-  --ds-text-primary: #eceff4;
-  --ds-text-secondary: #c5cad3;
-  --ds-text-muted: #9aa3b2;
-  --ds-border: #3d4452;
-  --ds-border-subtle: #353b47;
-  --ds-action: #8b72ff;
-  --ds-action-hover: #7a62eb;
-  --ds-focus: rgba(139, 114, 255, 0.45);
-  --ds-success: #6ee7a0;
-  --ds-warning: #f5c76a;
-  --ds-error: #f5a5a5;
+  /* Comfortable dark slate/navy — not pure black */
+  --ds-page: #0b1120;
+  --ds-surface-secondary: #172033;
+  --ds-surface: #111827;
+  --ds-surface-elevated: #1e293b;
+  --ds-surface-hover: #1e293b;
+  --ds-surface-input: #172033;
+  --ds-text-primary: #f8fafc;
+  --ds-text-secondary: #cbd5e1;
+  --ds-text-muted: #94a3b8;
+  --ds-border: #334155;
+  --ds-border-subtle: #1e293b;
+  --ds-action: #0f766e;
+  --ds-action-hover: #0d9488;
+  --ds-focus: rgba(15, 118, 110, 0.5);
+  --ds-success: #4ade80;
+  --ds-warning: #fbbf24;
+  --ds-error: #f87171;
 }
 
 .dark body {
@@ -184,6 +184,13 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Safety: never leave AOS content stuck invisible if init fails */
+[data-aos]:not(.aos-animate) {
+  opacity: 1 !important;
+  transform: none !important;
+  pointer-events: auto !important;
 }
 /* Extend */
 a {
