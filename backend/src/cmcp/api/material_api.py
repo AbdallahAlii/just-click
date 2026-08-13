@@ -42,7 +42,19 @@ def _handle_error(e: Exception):
     return api_error(str(e), status_code=400)
 
 def _external_base() -> str:
-    return (request.host_url or "").rstrip("/")
+    """
+    Base used only when shaping response URLs.
+
+    Prefer PUBLIC_API_BASE_URL when absolute API URLs are required.
+    Default empty string → relative `/api/media/...` paths so DEV→PROD
+    does not depend on request.host_url (localhost) or DB rewrites.
+    """
+    import os
+
+    explicit = (os.getenv("PUBLIC_API_BASE_URL") or "").strip().rstrip("/")
+    if explicit:
+        return explicit
+    return ""
 
 
 class MaterialDeleteIn(_BaseIn):

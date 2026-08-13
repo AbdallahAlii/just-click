@@ -370,19 +370,19 @@ const SignUpForm = () => {
             className="text-sm text-gray-600 dark:text-gray-400"
           >
             I agree to the{" "}
-            <a
-              href="#"
-              className="text-primaryColor font-semibold hover:underline"
+            <Link
+              href="/terms"
+              className="text-ds-action font-semibold hover:underline"
             >
               Terms
-            </a>{" "}
+            </Link>{" "}
             and{" "}
-            <a
-              href="#"
-              className="text-primaryColor font-semibold hover:underline"
+            <Link
+              href="/privacy"
+              className="text-ds-action font-semibold hover:underline"
             >
               Privacy Policy
-            </a>
+            </Link>
             .
           </label>
         </div>

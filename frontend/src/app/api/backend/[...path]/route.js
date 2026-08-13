@@ -55,13 +55,19 @@ async function proxy(req, ctx) {
       stack: err?.stack,
     });
 
+    const isProd = process.env.NODE_ENV === "production";
     return NextResponse.json(
       {
         success: false,
         message: "Proxy failed to reach Flask backend.",
-        target: String(targetUrl),
-        flask_origin: FLASK_ORIGIN,
-        error: String(err?.message || err),
+        // Never leak internal Flask origin to browsers in production.
+        ...(isProd
+          ? {}
+          : {
+              target: String(targetUrl),
+              flask_origin: FLASK_ORIGIN,
+              error: String(err?.message || err),
+            }),
       },
       { status: 500 }
     );

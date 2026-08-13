@@ -1,21 +1,16 @@
-import React from "react";
 import LoginMain from "@/components/layout/main/LoginMain";
 import ThemeController from "@/components/shared/others/ThemeController";
 
-
 export const metadata = {
-  title: "Login | Edurock - Education LMS Template",
-  description: "Login | Edurock - Education LMS Template",
-};
-const Login = () => {
-  return (
-    
-      <main>
-        <LoginMain />
-        <ThemeController />
-      </main>
-    
-  );
+  title: "Login | JustClick",
+  description: "Sign in to JustClick",
 };
 
-export default Login;
+export default function Login() {
+  return (
+    <main className="bg-ds-page">
+      <LoginMain />
+      <ThemeController />
+    </main>
+  );
+}

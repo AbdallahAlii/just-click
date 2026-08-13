@@ -210,6 +210,10 @@ const SidebarDashboard = () => {
               name: "Notifications",
               path: "/admin/dashboards/admin-academic/notifications",
             },
+            {
+              name: "Contact Messages",
+              path: "/admin/dashboards/admin-academic/contact",
+            },
           ],
         },
         {

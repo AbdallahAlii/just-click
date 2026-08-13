@@ -982,14 +982,36 @@ class MaterialsRepo:
         return getattr(material_type, "value", str(material_type)).lower()
 
     def _normalize_url(self, file_url: Optional[str], external_base: str) -> Optional[str]:
+        """
+        Rebuild media URLs for the current environment.
+
+        DB should store relative paths like `/api/media/file/<key>` (or legacy absolute
+        hosts). We always re-emit using external_base when provided, otherwise a
+        relative `/api/media/...` path so DEV→PROD does not require rewriting rows.
+        """
         if not file_url:
             return None
-        base = (external_base or "http://localhost:7000").rstrip("/")
+
+        raw = str(file_url).strip()
         marker = "/api/media/file/"
-        if marker in file_url:
-            key = file_url.split(marker, 1)[1]
+
+        # External LINK materials: leave untouched.
+        if raw.startswith(("http://", "https://")) and marker not in raw:
+            return raw
+
+        key = None
+        if marker in raw:
+            key = raw.split(marker, 1)[1]
+        elif raw.startswith("materials_files/"):
+            key = raw
+
+        if not key:
+            return raw
+
+        base = (external_base or "").rstrip("/")
+        if base:
             return f"{base}{marker}{key}"
-        return file_url
+        return f"{marker}{key}"
 
     def _download_url(self, file_url: Optional[str], external_base: str) -> Optional[str]:
         read = self._normalize_url(file_url, external_base)

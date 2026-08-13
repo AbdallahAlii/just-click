@@ -1,46 +1,41 @@
 import React from "react";
+import Link from "next/link";
 import LoginForm from "@/components/shared/login/LoginForm";
-import Image from "next/image";
-import shapImage2 from "@/assets/images/education/hero_shape2.png";
-import shapImage3 from "@/assets/images/education/hero_shape3.png";
-import shapImage4 from "@/assets/images/education/hero_shape4.png";
-import shapImage5 from "@/assets/images/education/hero_shape5.png";
 
 const LoginTab = () => {
   return (
-    <section className="relative">
-      <div className="container py-16 md:py-100px">
-        <div className="tab md:w-2/3 mx-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 md:p-10 border border-gray-100 dark:border-gray-700">
-            <LoginForm />
-          </div>
+    <section className="bg-ds-page">
+      <div className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-md flex-col justify-center px-6 py-12 sm:px-8 md:min-h-[calc(100vh-10rem)] md:py-16">
+        <div className="mb-8 text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action"
+          >
+            <span className="text-3xl font-bold tracking-tight">
+              <span className="text-ds-text-primary">Just</span>
+              <span className="text-ds-action">Click</span>
+            </span>
+          </Link>
+          <p className="mt-2 text-sm text-ds-text-muted">
+            Sign in to your class materials portal
+          </p>
         </div>
-      </div>
-      <div>
-        <Image
-          loading="lazy"
-          className="absolute right-[14%] top-[30%] animate-move-var"
-          src={shapImage2}
-          alt="Shape"
-        />
-        <Image
-          loading="lazy"
-          className="absolute left-[5%] top-1/2 animate-move-hor"
-          src={shapImage3}
-          alt="Shape"
-        />
-        <Image
-          loading="lazy"
-          className="absolute left-1/2 bottom-[60px] animate-spin-slow"
-          src={shapImage4}
-          alt="Shape"
-        />
-        <Image
-          loading="lazy"
-          className="absolute left-1/2 top-10 animate-spin-slow"
-          src={shapImage5}
-          alt="Shape"
-        />
+
+        <div className="rounded-2xl border border-ds-border bg-ds-surface p-6 sm:p-8 shadow-sm">
+          <LoginForm />
+        </div>
+
+        <p className="mt-6 text-center text-xs text-ds-text-muted">
+          By continuing you agree to our{" "}
+          <Link href="/terms" className="font-semibold text-ds-action hover:underline">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="font-semibold text-ds-action hover:underline">
+            Privacy
+          </Link>
+          .
+        </p>
       </div>
     </section>
   );

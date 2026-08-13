@@ -12,6 +12,9 @@ const PUBLIC_AUTH_PREFIXES = [
   "/verify-email",
   "/forgot-password",
   "/reset-password",
+  "/privacy",
+  "/terms",
+  "/contact",
 ];
 
 export function useSession() {

@@ -207,5 +207,6 @@ New materials will not be indexed for AI chat until jobs are processed.
 
 ## Related docs
 
+- `PRODUCTION_ENV_AND_DEPLOYMENT.md` — full DEV/PROD env, media, encryption, Nginx notes
 - `NOTIFICATIONS_AND_WORKERS.md` — email/push details
 - `CHATBOT.md` (if present) — indexing and RAG notes

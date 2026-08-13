@@ -10,6 +10,9 @@ from cmcp.api.admin_onboarding_api import bp as admin_onboarding_bp
 from cmcp.api.course_api import bp as academic_courses
 from cmcp.api.chatbot_api import bp as chatbot_bp
 from cmcp.api.notification_api import bp as notification_bp
+from cmcp.api.contact_api import bp as contact_bp
+
+
 def register_blueprints(app):
     app.register_blueprint(health_bp)
     app.register_blueprint(media_bp)
@@ -23,4 +26,5 @@ def register_blueprints(app):
     app.register_blueprint(academic_courses)
     app.register_blueprint(chatbot_bp)
     app.register_blueprint(notification_bp)
+    app.register_blueprint(contact_bp)
 

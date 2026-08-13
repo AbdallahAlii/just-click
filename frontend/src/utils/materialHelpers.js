@@ -18,9 +18,28 @@ export function formatFileSize(sizeMb) {
   return `${num % 1 === 0 ? num.toFixed(0) : num.toFixed(1)} MB`;
 }
 
+/**
+ * Route media through the Next.js same-origin proxy so cookies work in
+ * both DEV and PROD without hard-coding backend hosts.
+ *
+ * /api/media/file/...              → /api/backend/media/file/...
+ * http://localhost:7000/api/media… → /api/backend/media/...
+ */
 export function normalizeMaterialUrl(url) {
   if (!url) return "";
-  return String(url).replace("http://127.0.0.1:7000", "http://localhost:7000");
+  const raw = String(url).trim();
+
+  const mediaIdx = raw.indexOf("/api/media/");
+  if (mediaIdx !== -1) {
+    const mediaPath = raw.slice(mediaIdx); // /api/media/...
+    return `/api/backend${mediaPath.slice(4)}`; // /api/backend/media/...
+  }
+
+  if (raw.startsWith("/api/backend/")) {
+    return raw;
+  }
+
+  return raw;
 }
 
 export function getMaterialFile(material) {

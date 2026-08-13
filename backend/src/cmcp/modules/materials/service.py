@@ -920,7 +920,10 @@ class MaterialsService:
             if not new_key:
                 raise BusinessValidationError("File upload failed: missing file content.")
 
-            material.file_url = file_url_from_key(new_key, external_base=external_base)
+            # Persist portable relative media path only — never localhost/VPS host.
+            # Response URLs are rebuilt at read time from request/proxy context.
+            _ = external_base
+            material.file_url = file_url_from_key(new_key)
             self.s.flush([material])
 
         except Exception as e:
