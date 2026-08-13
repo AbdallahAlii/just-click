@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+from datetime import datetime, timezone
 from typing import Tuple, Dict, Any, Optional
 
 from flask import session
@@ -8,7 +10,16 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from cmcp.config.database import db
 from cmcp.modules.auth.repo.auth_repository import AuthRepository
-from cmcp.common.security.passwords import verify_password
+from cmcp.modules.auth.models import UserStatusEnum
+from cmcp.common.security.passwords import verify_password, hash_password
+from cmcp.common.security.password_rules import ensure_password_ok
+from cmcp.common.security.tokens import (
+    generate_password_reset_token,
+    hash_token,
+    verify_token,
+)
+from cmcp.common.email.service import EmailService
+from cmcp.common.validation.text import normalize_email
 
 from cmcp.common.cache import cached_user_profile, bump_user_profile
 from cmcp.common.cache.session_manager import (
@@ -21,10 +32,33 @@ from cmcp.security.rbac_context import build_auth_context
 
 log = logging.getLogger(__name__)
 
+_NEUTRAL_FORGOT_MSG = (
+    "If an account exists for this email, password reset instructions have been sent."
+)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _frontend_base_url() -> str:
+    return (
+        os.getenv("APP_BASE_URL")
+        or os.getenv("FRONTEND_BASE_URL")
+        or "http://localhost:3000"
+    ).rstrip("/")
+
 
 class AuthService:
     def __init__(self, repo: Optional[AuthRepository] = None):
         self.repo = repo or AuthRepository()
+        self.email_svc = EmailService(
+            session=db.session,
+            provider=os.getenv("MAIL_PROVIDER", "smtp"),
+            from_email=os.getenv("MAIL_FROM_EMAIL", ""),
+            from_name=os.getenv("MAIL_FROM_NAME", "JustClick"),
+            max_tries=int(os.getenv("EMAIL_OUTBOX_MAX_TRIES", "5")),
+        )
 
     def login(
         self, *, username: str, password: str, company_id: Optional[int] = None
@@ -129,3 +163,127 @@ class AuthService:
             builder=lambda: self.build_user_profile_dict(int(user_id), company_id),
             ttl=3 * 3600,
         )
+
+    def _display_name_for_user(self, user) -> str:
+        try:
+            from cmcp.modules.education_people.models import StudentProfile, StaffProfile
+
+            student = (
+                db.session.query(StudentProfile.full_name)
+                .filter(StudentProfile.user_id == int(user.id))
+                .first()
+            )
+            if student and student[0]:
+                return str(student[0])
+
+            staff = (
+                db.session.query(StaffProfile.full_name)
+                .filter(StaffProfile.user_id == int(user.id))
+                .first()
+            )
+            if staff and staff[0]:
+                return str(staff[0])
+        except Exception:
+            log.debug("Could not resolve display name for password reset.", exc_info=True)
+        return str(user.username)
+
+    def request_password_reset(self, *, email: str) -> Tuple[bool, str]:
+        """
+        Always returns a neutral success message (no account enumeration).
+        Queues reset email via EmailOutbox when a resettable account exists.
+        """
+        try:
+            normalized = normalize_email(email)
+        except Exception:
+            return True, _NEUTRAL_FORGOT_MSG
+
+        user = self.repo.get_user_by_email(normalized)
+        if not user or not user.is_enabled or user.status != UserStatusEnum.ACTIVE:
+            return True, _NEUTRAL_FORGOT_MSG
+
+        ttl = int(os.getenv("PASSWORD_RESET_TOKEN_TTL_MINUTES", "60"))
+        tok = generate_password_reset_token(ttl_minutes=ttl)
+        reset_link = f"{_frontend_base_url()}/reset-password?token={tok.token}"
+
+        try:
+            user.password_reset_token_hash = tok.token_hash
+            user.password_reset_expires_at = tok.expires_at
+
+            self.email_svc.enqueue(
+                to_email=user.email,
+                subject="Reset your JustClick password",
+                template="password_reset",
+                payload={
+                    "full_name": self._display_name_for_user(user),
+                    "username": user.username,
+                    "reset_link": reset_link,
+                    "expires_minutes": ttl,
+                },
+                ref_type="User",
+                ref_id=int(user.id),
+            )
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            log.exception("Failed to queue password reset for user_id=%s", getattr(user, "id", None))
+            # Still neutral — do not reveal failure type to client
+            return True, _NEUTRAL_FORGOT_MSG
+
+        return True, _NEUTRAL_FORGOT_MSG
+
+    def reset_password_with_token(
+        self, *, token: str, new_password: str, confirm_password: str
+    ) -> Tuple[bool, str]:
+        raw = (token or "").strip()
+        if not raw:
+            return False, "Invalid or expired password reset link."
+
+        if (new_password or "") != (confirm_password or ""):
+            return False, "Passwords do not match."
+
+        try:
+            ensure_password_ok(new_password)
+        except Exception as e:
+            return False, getattr(e, "description", None) or str(e) or "Invalid password."
+
+        token_hash = hash_token(raw)
+        user = self.repo.get_user_by_password_reset_token_hash(token_hash)
+        if not user or not user.password_reset_token_hash or not user.password_reset_expires_at:
+            return False, "Invalid or expired password reset link."
+
+        expires = user.password_reset_expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if _utcnow() > expires:
+            user.password_reset_token_hash = None
+            user.password_reset_expires_at = None
+            try:
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
+            return False, "Invalid or expired password reset link."
+
+        if not verify_token(raw, user.password_reset_token_hash):
+            return False, "Invalid or expired password reset link."
+
+        try:
+            user.password_hash = hash_password(new_password)
+            user.password_reset_token_hash = None
+            user.password_reset_expires_at = None
+            user.must_change_password = False
+            user.temp_password_expires_at = None
+            if hasattr(user, "session_version"):
+                user.session_version = int(getattr(user, "session_version", 0) or 0) + 1
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            log.exception("Failed to reset password for user_id=%s", getattr(user, "id", None))
+            return False, "Could not reset password. Please try again."
+
+        try:
+            bump_user_profile(int(user.id), None)
+            remove_session(int(user.id))
+        except Exception:
+            log.warning("Post password-reset session cleanup failed.", exc_info=True)
+
+        return True, "Password reset successfully. You can now sign in."

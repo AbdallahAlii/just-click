@@ -340,6 +340,22 @@ export function useReplyMaterialFeedback(options = {}) {
   });
 }
 
+export function useReplyMaterialDiscussion(options = {}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: materialsApi.replyDiscussion,
+    onSuccess: (data, variables, context) => {
+      const feedbackId = variables?.feedbackId;
+      queryClient.invalidateQueries({ queryKey: materialsKeys.root });
+      if (feedbackId) {
+        queryClient.invalidateQueries({ queryKey: materialsKeys.feedback });
+      }
+      if (options.onSuccess) options.onSuccess(data, variables, context);
+    },
+    ...options,
+  });
+}
+
 export function useResolveMaterialFeedback(options = {}) {
   const queryClient = useQueryClient();
   return useMutation({

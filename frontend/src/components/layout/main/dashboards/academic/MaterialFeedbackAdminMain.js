@@ -274,7 +274,23 @@ export default function MaterialFeedbackAdminMain() {
                   </div>
                 ) : null}
 
-                {item.admin_reply ? (
+                {Array.isArray(item.replies) && item.replies.length > 0 ? (
+                  <div className="rounded-xl bg-ds-surface-secondary border border-ds-border-subtle px-4 py-3 space-y-2">
+                    <p className="text-xs font-semibold text-ds-action">
+                      Discussion replies
+                    </p>
+                    {item.replies.map((reply) => (
+                      <div key={reply.id} className="text-sm">
+                        <span className="font-semibold text-ds-text-primary">
+                          {reply.user?.full_name || reply.user?.username || "User"}
+                        </span>
+                        <p className="text-ds-text-secondary whitespace-pre-wrap break-words mt-0.5">
+                          {reply.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : item.admin_reply ? (
                   <div className="rounded-xl bg-ds-surface-secondary border border-ds-border-subtle px-4 py-3">
                     <p className="text-xs font-semibold text-ds-action mb-1">
                       Your reply (visible to students)

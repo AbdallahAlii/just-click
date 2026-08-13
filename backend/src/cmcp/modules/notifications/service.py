@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from cmcp.common.email.service import EmailService
-from cmcp.common.push.fcm_client import FCMClient
+from cmcp.common.push.fcm_client import FCMClient, FCMDeliveryError
 from cmcp.modules.notifications.models import NotificationEventType
 from cmcp.modules.notifications.repository import NotificationsRepo, NotifyRecipient
 
@@ -449,7 +449,7 @@ class PushNotificationService:
         for row in rows:
             try:
                 if not self.fcm.is_configured():
-                    self.repo.mark_push_skipped(row, "FIREBASE_SERVER_KEY not configured")
+                    self.repo.mark_push_skipped(row, "FIREBASE_SERVICE_ACCOUNT_JSON not configured")
                     self.s.commit()
                     processed += 1
                     continue
@@ -469,9 +469,33 @@ class PushNotificationService:
                 self.repo.mark_push_sent(row)
                 self.s.commit()
                 processed += 1
+            except FCMDeliveryError as e:
+                if self._is_unregistered_token_error(e):
+                    self.repo.deactivate_device_token(
+                        company_id=int(row.company_id),
+                        user_id=int(row.user_id),
+                        token=row.device_token,
+                    )
+                    self.repo.mark_push_skipped(row, f"Device token is no longer registered: {e}")
+                else:
+                    self.repo.mark_push_failed(row, str(e), max_tries=self.max_tries)
+                self.s.commit()
+                processed += 1
+                log.warning("push skipped outbox_id=%s fcm_error=%s", row.id, e.error_code)
             except Exception as e:
                 self.repo.mark_push_failed(row, str(e), max_tries=self.max_tries)
                 self.s.commit()
+                processed += 1
                 log.exception("push failed outbox_id=%s", row.id)
 
         return processed
+
+    @staticmethod
+    def _is_unregistered_token_error(error: FCMDeliveryError) -> bool:
+        code = str(error.error_code or "").upper()
+        message = str(error).upper()
+        return (
+            code in {"UNREGISTERED", "NOT_FOUND", "NOTREGISTERED"}
+            or "UNREGISTERED" in message
+            or "NOTREGISTERED" in message
+        )

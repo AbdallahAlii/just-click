@@ -43,6 +43,18 @@ export const authApi = {
       )}&token=${encodeURIComponent(token)}`,
     ),
 
+  forgotPassword: (payload) =>
+    fetchJSON("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  resetPassword: (payload) =>
+    fetchJSON("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
   getMyProfilePage: (params = {}) =>
     fetchJSON(`/auth/me/profile-page${toQueryString(params)}`),
 

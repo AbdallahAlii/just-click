@@ -17,6 +17,7 @@ from cmcp.modules.materials.schemas import MaterialCreateIn, MaterialUpdateIn, M
 from cmcp.modules.materials.feedback_schemas import (
     MaterialFeedbackCreateIn,
     MaterialFeedbackReplyIn,
+    MaterialFeedbackDiscussionReplyIn,
     MaterialFeedbackResolveIn,
 )
 from cmcp.modules.materials.service import MaterialsService
@@ -862,6 +863,28 @@ def reply_material_feedback(company_id: int, feedback_id: int):
         )
         _commit_ok(ok)
         return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=404)
+    except ValidationError as e:
+        return api_error(_clean_pydantic_error(e), status_code=400)
+    except Exception as e:
+        return _handle_error(e)
+
+
+@bp.post("/feedback/<int:feedback_id>/replies")
+@require_company_and_permission(doctype="Material", action="READ")
+def post_material_feedback_discussion_reply(company_id: int, feedback_id: int):
+    """Authorized material users (students/staff/admins) reply on public discussions."""
+    try:
+        payload = MaterialFeedbackDiscussionReplyIn.model_validate(_json_body())
+        ok, msg, out = svc.add_discussion_reply(
+            company_id=company_id,
+            feedback_id=feedback_id,
+            message=payload.message,
+        )
+        _commit_ok(ok)
+        status = 200 if ok else 404
+        if not ok and "cannot reply" in (msg or "").lower():
+            status = 403
+        return api_success(message=msg, data=out, status_code=200) if ok else api_error(msg, status_code=status)
     except ValidationError as e:
         return api_error(_clean_pydantic_error(e), status_code=400)
     except Exception as e:

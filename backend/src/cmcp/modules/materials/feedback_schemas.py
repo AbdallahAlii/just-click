@@ -52,5 +52,19 @@ class MaterialFeedbackReplyIn(_BaseIn):
     admin_reply: str = Field(..., min_length=1, max_length=2000)
 
 
+class MaterialFeedbackDiscussionReplyIn(_BaseIn):
+    message: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("message")
+    @classmethod
+    def validate_message(cls, v: str) -> str:
+        text = (v or "").strip()
+        if not text:
+            raise ValueError("message is required.")
+        if len(text) > 2000:
+            raise ValueError("message is too long.")
+        return text
+
+
 class MaterialFeedbackResolveIn(_BaseIn):
     admin_reply: Optional[str] = Field(default=None, max_length=2000)

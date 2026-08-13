@@ -100,7 +100,12 @@ def create_app() -> Flask:
         app,
         supports_credentials=True,
         origins=settings.CORS_ALLOWED_ORIGINS,
-        allow_headers=["Content-Type", "Authorization", "Cookie"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "Cookie",
+            "X-Company-Id",
+        ],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )
 

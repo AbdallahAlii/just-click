@@ -273,6 +273,13 @@ class MaterialFeedback(BaseModel, TenantMixin):
     )
 
     material: Mapped["Material"] = db.relationship("Material", back_populates="feedback_entries", lazy="select")
+    replies: Mapped[list["MaterialFeedbackReply"]] = db.relationship(
+        "MaterialFeedbackReply",
+        back_populates="feedback",
+        cascade="all, delete-orphan",
+        lazy="select",
+        order_by="MaterialFeedbackReply.created_at.asc()",
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -289,4 +296,33 @@ class MaterialFeedback(BaseModel, TenantMixin):
         ),
         Index("ix_material_feedback_company_material", "company_id", "material_id"),
         Index("ix_material_feedback_company_status", "company_id", "status"),
+    )
+
+
+class MaterialFeedbackReply(BaseModel, TenantMixin):
+    """Threaded reply on a material feedback discussion (students + staff/admins)."""
+    __tablename__ = "edu_material_feedback_replies"
+
+    feedback_id: Mapped[int] = mapped_column(
+        db.BigInteger,
+        db.ForeignKey("edu_material_feedback.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        db.BigInteger,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    message: Mapped[str] = mapped_column(db.Text, nullable=False)
+
+    feedback: Mapped["MaterialFeedback"] = db.relationship(
+        "MaterialFeedback",
+        back_populates="replies",
+        lazy="select",
+    )
+
+    __table_args__ = (
+        Index("ix_feedback_replies_company_feedback", "company_id", "feedback_id"),
     )

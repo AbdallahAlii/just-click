@@ -19,6 +19,16 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordWithTokenRequest(BaseModel):
+    token: str = Field(..., min_length=10)
+    new_password: str = Field(..., min_length=6)
+    confirm_password: str = Field(..., min_length=6)
+
+
 class AffiliationOut(BaseModel):
     id: int
     company_id: int

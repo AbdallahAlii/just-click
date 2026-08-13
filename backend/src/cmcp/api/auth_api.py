@@ -16,7 +16,11 @@ from cmcp.modules.auth.deps import get_current_user
 from cmcp.modules.auth.schemas import (
     LoginRequest,
     ChangeMyPasswordRequest,
-    ResetPasswordRequest, UserProfilePageOut, UpdateMyProfilePageRequest,
+    ResetPasswordRequest,
+    ForgotPasswordRequest,
+    ResetPasswordWithTokenRequest,
+    UserProfilePageOut,
+    UpdateMyProfilePageRequest,
 )
 from cmcp.modules.auth.service.auth_service import AuthService
 from cmcp.modules.auth.service.user_profile_page import UserProfilePageService
@@ -155,6 +159,40 @@ def verify_email():
     ok, msg = edu_svc.verify_email(username=username, token=token)
     if ok:
         return api_success(message=msg, data={"username": username}, status_code=200)
+    return api_error(message=msg, status_code=400)
+
+
+@bp.post("/forgot-password")
+@public
+@rate_limit(key_prefix="forgot_password", limit=5, window=60)
+def forgot_password():
+    payload = request.get_json(silent=True) or {}
+    try:
+        req = ForgotPasswordRequest(**payload)
+    except ValidationError as e:
+        return api_error(clean_pydantic_error(e), status_code=400)
+
+    ok, msg = auth_svc.request_password_reset(email=str(req.email))
+    return api_success(message=msg, data={}) if ok else api_error(msg, status_code=400)
+
+
+@bp.post("/reset-password")
+@public
+@rate_limit(key_prefix="reset_password", limit=5, window=60)
+def reset_password_with_token():
+    payload = request.get_json(silent=True) or {}
+    try:
+        req = ResetPasswordWithTokenRequest(**payload)
+    except ValidationError as e:
+        return api_error(clean_pydantic_error(e), status_code=400)
+
+    ok, msg = auth_svc.reset_password_with_token(
+        token=req.token,
+        new_password=req.new_password,
+        confirm_password=req.confirm_password,
+    )
+    if ok:
+        return api_success(message=msg, data={})
     return api_error(message=msg, status_code=400)
 
 @bp.get("/me/profile-page")

@@ -132,16 +132,75 @@ UNIVERSITIES: List[Dict[str, Any]] = [
             "materials": {
                 "include_course_syllabus": True,
                 "include_chapter_slides": True,
+                "materials_per_chapter": 15,
                 "mock_files_dir": "mock_files",
                 "pdf_files": [
                     "Operating System Concepts Essentials - A. Silberschatz, et al., (Wiley, 2011) WW (1).pdf",
                     "Chapter 2  Operating-System Structures.ppt.pdf",
+                    "Mobile and Web based FYPs.pdf",
+                    "NLP_Guidline.pdf",
+                    "What is a data structure2.pdf",
                 ],
                 "slide_files": [
                     "Chapter 5  CPU Scheduling_Part_One.pptx",
+                    "Chapter 4 Making Decisions.pptx",
+                    "Java Collections - Stack Structure.pptx",
+                    "Oracle 12c Chapter 7-1.pptx",
                     "ethcpp06.ppt",
                     "Lecture 252.ppt",
                     "s.ppt",
+                ],
+                "doc_files": [
+                    "DCMMS_full  updated last 2.docx",
+                    "DSA Quiz 2 (2213).docx",
+                    "RMS_Database_Design.docx",
+                ],
+                "video_files": [
+                    "WhatsApp Video 2026-08-13 at 10.06.17 AM.mp4",
+                    "WhatsApp Video 2026-08-13 at 10.06.27 AM.mp4",
+                    "WhatsApp Video 2026-08-13 at 10.06.28 AM.mp4",
+                ],
+                "link_resources": [
+                    {
+                        "title_suffix": "Python Docs — Tutorial",
+                        "url": "https://docs.python.org/3/tutorial/",
+                        "description": "Official Python tutorial covering core language concepts.",
+                    },
+                    {
+                        "title_suffix": "MDN — JavaScript Guide",
+                        "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide",
+                        "description": "MDN JavaScript guide for web fundamentals.",
+                    },
+                    {
+                        "title_suffix": "PostgreSQL Docs — SQL",
+                        "url": "https://www.postgresql.org/docs/current/sql.html",
+                        "description": "PostgreSQL SQL language reference.",
+                    },
+                    {
+                        "title_suffix": "React Docs — Learn React",
+                        "url": "https://react.dev/learn",
+                        "description": "Official React learning path for components and state.",
+                    },
+                    {
+                        "title_suffix": "Next.js Docs",
+                        "url": "https://nextjs.org/docs",
+                        "description": "Next.js documentation for app routing and rendering.",
+                    },
+                    {
+                        "title_suffix": "FastAPI Docs",
+                        "url": "https://fastapi.tiangolo.com/",
+                        "description": "FastAPI documentation for modern Python APIs.",
+                    },
+                    {
+                        "title_suffix": "Git Book — Basics",
+                        "url": "https://git-scm.com/book/en/v2/Getting-Started-About-Version-Control",
+                        "description": "Pro Git book chapter on version control basics.",
+                    },
+                    {
+                        "title_suffix": "Stack Overflow — Processes vs Threads",
+                        "url": "https://stackoverflow.com/questions/200469/what-is-the-difference-between-a-process-and-a-thread",
+                        "description": "Community discussion comparing processes and threads.",
+                    },
                 ],
             },
         },

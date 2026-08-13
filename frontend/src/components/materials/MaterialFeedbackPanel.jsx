@@ -3,6 +3,7 @@
 import {
   useMaterialFeedback,
   useSubmitMaterialFeedback,
+  useReplyMaterialDiscussion,
 } from "@/features/materials/hooks";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { useMemo, useState } from "react";
@@ -19,6 +20,28 @@ const TYPE_LABELS = {
   clarification: "Question",
   broken_file: "Issue report",
 };
+
+function initials(name) {
+  const parts = String(name || "?")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function formatWhen(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
 
 function StarRating({ value, onChange, disabled }) {
   return (
@@ -41,9 +64,154 @@ function StarRating({ value, onChange, disabled }) {
   );
 }
 
+function AuthorRow({ name, when, badge }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <div
+        className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ds-surface-secondary text-[11px] font-semibold text-ds-text-secondary"
+        aria-hidden="true"
+      >
+        {initials(name)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className="text-sm font-semibold text-ds-text-primary">
+            {name}
+          </span>
+          {badge ? (
+            <span className="text-[11px] uppercase tracking-wide text-ds-text-muted">
+              {badge}
+            </span>
+          ) : null}
+          {when ? (
+            <span className="text-[11px] text-ds-text-muted">{when}</span>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DiscussionItem({ item, onReply, replyPending }) {
+  const [open, setOpen] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const name = item.user?.full_name || item.user?.username || "Student";
+  const replies = Array.isArray(item.replies) ? item.replies : [];
+  const canReply =
+    item.feedback_type === "comment" ||
+    item.feedback_type === "clarification" ||
+    item.feedback_type === "broken_file";
+
+  const submitReply = async (e) => {
+    e.preventDefault();
+    const text = replyText.trim();
+    if (!text) {
+      toast.error("Please enter a reply.");
+      return;
+    }
+    await onReply(item.id, text);
+    setReplyText("");
+    setOpen(false);
+  };
+
+  return (
+    <article className="border-b border-ds-border-subtle last:border-b-0 py-4">
+      <AuthorRow
+        name={name}
+        when={formatWhen(item.created_at)}
+        badge={TYPE_LABELS[item.feedback_type] || item.feedback_type}
+      />
+      {item.message ? (
+        <p className="mt-2 pl-[42px] text-sm text-ds-text-secondary whitespace-pre-wrap">
+          {item.message}
+        </p>
+      ) : null}
+      {item.status ? (
+        <p className="mt-1 pl-[42px] text-[11px] text-ds-text-muted">
+          Status: {item.status}
+        </p>
+      ) : null}
+
+      {replies.length > 0 ? (
+        <div className="mt-3 ml-[42px] space-y-3 border-l border-ds-border pl-3">
+          {replies.map((reply) => {
+            const replyName =
+              reply.user?.full_name || reply.user?.username || "User";
+            return (
+              <div key={reply.id}>
+                <AuthorRow
+                  name={replyName}
+                  when={formatWhen(reply.created_at)}
+                />
+                <p className="mt-1.5 pl-[42px] text-sm text-ds-text-secondary whitespace-pre-wrap">
+                  {reply.message}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {/* Legacy single admin_reply if somehow not migrated into replies */}
+      {!replies.length && item.admin_reply ? (
+        <div className="mt-3 ml-[42px] border-l border-ds-border pl-3">
+          <p className="text-xs font-semibold text-ds-action mb-1">Admin reply</p>
+          <p className="text-sm text-ds-text-secondary whitespace-pre-wrap">
+            {item.admin_reply}
+          </p>
+        </div>
+      ) : null}
+
+      {canReply ? (
+        <div className="mt-3 pl-[42px]">
+          {!open ? (
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="text-xs font-semibold text-ds-action hover:underline"
+            >
+              Reply
+            </button>
+          ) : (
+            <form onSubmit={submitReply} className="space-y-2">
+              <textarea
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                rows={2}
+                placeholder="Write a reply..."
+                className="w-full rounded-lg border border-ds-border bg-ds-surface-input px-3 py-2 text-sm text-ds-text-primary placeholder:text-ds-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-focus"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={replyPending}
+                  className="px-3 py-1.5 rounded-lg bg-ds-action text-white text-xs font-semibold disabled:opacity-60 hover:bg-ds-action-hover min-h-[32px]"
+                >
+                  {replyPending ? "Posting..." : "Post reply"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setReplyText("");
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-ds-text-secondary hover:bg-ds-surface-secondary min-h-[32px]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 export default function MaterialFeedbackPanel({ materialId, stats = {} }) {
   const { data, isLoading, refetch } = useMaterialFeedback(materialId);
   const submitMut = useSubmitMaterialFeedback();
+  const replyMut = useReplyMaterialDiscussion();
 
   const [activeTab, setActiveTab] = useState("comment");
   const [rating, setRating] = useState(0);
@@ -104,11 +272,22 @@ export default function MaterialFeedbackPanel({ materialId, stats = {} }) {
       toast.success(
         activeTab === "broken_file"
           ? "Issue reported. Admins will review it privately."
-          : "Posted. Other students and admins can see it.",
+          : "Posted. Other students can see and reply.",
       );
       refetch();
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not submit feedback."));
+    }
+  };
+
+  const handleReply = async (feedbackId, text) => {
+    try {
+      await replyMut.mutateAsync({ feedbackId, message: text });
+      toast.success("Reply posted.");
+      refetch();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not post reply."));
+      throw err;
     }
   };
 
@@ -117,42 +296,17 @@ export default function MaterialFeedbackPanel({ materialId, stats = {} }) {
       return <p className="text-sm text-ds-text-muted">Loading...</p>;
     }
     if (!list.length) {
-      return (
-        <p className="text-sm text-ds-text-muted">{emptyText}</p>
-      );
+      return <p className="text-sm text-ds-text-muted">{emptyText}</p>;
     }
     return (
-      <div className="space-y-4">
+      <div>
         {list.map((item) => (
-          <div
+          <DiscussionItem
             key={item.id}
-            className="rounded-xl border border-ds-border p-4 bg-ds-surface-secondary"
-          >
-            <div className="flex items-center justify-between gap-3 mb-2">
-              <span className="text-sm font-semibold text-ds-text-primary">
-                {item.user?.full_name || item.user?.username || "Student"}
-              </span>
-              <span className="text-[11px] uppercase tracking-wide text-ds-text-muted">
-                {TYPE_LABELS[item.feedback_type] || item.feedback_type}
-                {item.status ? ` · ${item.status}` : ""}
-              </span>
-            </div>
-            {item.message ? (
-              <p className="text-sm text-ds-text-secondary whitespace-pre-wrap">
-                {item.message}
-              </p>
-            ) : null}
-            {item.admin_reply ? (
-              <div className="mt-3 rounded-lg bg-ds-surface-elevated border border-ds-border-subtle px-3 py-2">
-                <p className="text-xs font-semibold text-ds-action mb-1">
-                  Admin reply
-                </p>
-                <p className="text-sm text-ds-text-secondary whitespace-pre-wrap">
-                  {item.admin_reply}
-                </p>
-              </div>
-            ) : null}
-          </div>
+            item={item}
+            onReply={handleReply}
+            replyPending={replyMut.isPending}
+          />
         ))}
       </div>
     );
@@ -166,8 +320,8 @@ export default function MaterialFeedbackPanel({ materialId, stats = {} }) {
             Feedback & discussion
           </h3>
           <p className="text-sm text-ds-text-muted mt-1">
-            Comments and questions are visible to all students. Broken-file
-            reports are private — only you and admins see them.
+            Comments and questions are a shared class discussion. Broken-file
+            reports stay private between you and admins.
           </p>
         </div>
         <div className="text-sm text-ds-text-muted">
@@ -221,8 +375,8 @@ export default function MaterialFeedbackPanel({ materialId, stats = {} }) {
             activeTab === "broken_file"
               ? "Describe what is wrong with the file (only admins see this)..."
               : activeTab === "clarification"
-                ? "Ask a question other students can see..."
-                : "Leave a comment..."
+                ? "Ask a question other students can see and answer..."
+                : "Leave a comment for the class..."
           }
           className="w-full rounded-xl border border-ds-border bg-ds-surface-input px-4 py-3 text-sm text-ds-text-primary placeholder:text-ds-text-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ds-focus"
         />
@@ -237,12 +391,15 @@ export default function MaterialFeedbackPanel({ materialId, stats = {} }) {
 
       <div className="space-y-6">
         <div>
-          <h4 className="font-semibold text-ds-text-primary mb-3">
+          <h4 className="font-semibold text-ds-text-primary mb-1">
             Comments & questions
           </h4>
+          <p className="text-xs text-ds-text-muted mb-2">
+            Shared with everyone who can access this material.
+          </p>
           {renderThread(
             publicItems,
-            "No comments yet. Be the first to ask a question.",
+            "No comments yet. Be the first to start the discussion.",
           )}
         </div>
 
@@ -251,7 +408,7 @@ export default function MaterialFeedbackPanel({ materialId, stats = {} }) {
             <h4 className="font-semibold text-ds-text-primary mb-1">
               Your issue reports
             </h4>
-            <p className="text-xs text-ds-text-muted mb-3">
+            <p className="text-xs text-ds-text-muted mb-2">
               Only visible to you and department admins.
             </p>
             {renderThread(ownReports, "")}

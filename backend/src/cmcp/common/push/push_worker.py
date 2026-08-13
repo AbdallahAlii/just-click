@@ -48,7 +48,7 @@ def run_push_worker_forever() -> None:
                             log.info("Push worker idle — no pending push notifications.")
                         else:
                             log.warning(
-                                "Push worker idle — FIREBASE_SERVER_KEY is not set. "
+                                "Push worker idle — FIREBASE_SERVICE_ACCOUNT_JSON is not set. "
                                 "Push rows will be marked skipped when processed."
                             )
                         idle_logged = True

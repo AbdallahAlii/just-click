@@ -34,3 +34,10 @@ def generate_email_verify_token(ttl_minutes: int = 30) -> TokenWithExpiry:
     tok = generate_token(32)
     exp = _utcnow() + timedelta(minutes=int(ttl_minutes))
     return TokenWithExpiry(token=tok, token_hash=hash_token(tok), expires_at=exp)
+
+
+def generate_password_reset_token(ttl_minutes: int = 60) -> TokenWithExpiry:
+    """Secure one-time password-reset token (hashed at rest)."""
+    tok = generate_token(32)
+    exp = _utcnow() + timedelta(minutes=int(ttl_minutes))
+    return TokenWithExpiry(token=tok, token_hash=hash_token(tok), expires_at=exp)

@@ -194,6 +194,21 @@ class NotificationsRepo:
             .all()
         )
 
+    def deactivate_device_token(self, *, company_id: int, user_id: int, token: str) -> int:
+        rows = (
+            self.s.query(UserDeviceToken)
+            .filter(
+                UserDeviceToken.company_id == int(company_id),
+                UserDeviceToken.user_id == int(user_id),
+                UserDeviceToken.token == (token or "").strip(),
+                UserDeviceToken.is_active.is_(True),
+            )
+            .all()
+        )
+        for row in rows:
+            row.is_active = False
+        return len(rows)
+
     def upsert_device_token(
         self,
         *,

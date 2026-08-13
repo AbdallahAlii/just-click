@@ -98,13 +98,18 @@ Recent batches now show delivery status: `sent`, `pending`, or `failed` (from em
 
 ## Typical local dev setup
 
-Use **three terminals**:
+Use **three terminals** (plus chatbot index worker if you use JustClick AI):
 
 1. Flask API server
 2. Email worker
 3. Push worker (optional until FCM is configured)
+4. Chatbot index worker (required for AI over materials)
 
 Notifications are **queued immediately** when you click Send or upload a material. Workers deliver them asynchronously.
+
+Forgot-password emails also go through `email_outbox` (`password_reset` template) and require the email worker.
+
+For VPS/production process layout, seed order, and systemd guidance, see **[PRODUCTION_WORKERS_AND_SEED.md](./PRODUCTION_WORKERS_AND_SEED.md)**.
 
 ## Mobile app integration
 

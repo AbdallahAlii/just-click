@@ -184,6 +184,12 @@ export const materialsApi = {
       body: JSON.stringify({ admin_reply }),
     }),
 
+  replyDiscussion: ({ feedbackId, message }) =>
+    fetchJSON(`/materials/feedback/${feedbackId}/replies`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+
   resolveFeedback: ({ feedbackId, admin_reply }) =>
     fetchJSON(`/materials/feedback/${feedbackId}/resolve`, {
       method: "POST",

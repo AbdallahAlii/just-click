@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from cmcp.core.base_service import BaseService
 from cmcp.core.exceptions import BusinessValidationError, NotFoundError
 
-from cmcp.modules.materials.models import Material, MaterialTypeEnum
+from cmcp.modules.materials.models import Material, MaterialTypeEnum, MaterialFeedbackTypeEnum
 from cmcp.modules.media.service import save_file_for
 from cmcp.modules.media.utils import MediaFolder
 from cmcp.modules.media.encrypted_files import file_url_from_key
@@ -1598,9 +1598,61 @@ class MaterialsService:
         )
         if not row:
             return False, "Feedback not found.", {}
+        shaped = self.repo._shape_feedback_row(row, None, None)
+        shaped = self.repo._attach_feedback_replies(company_id=company_id, items=[shaped])[0]
         return True, "Reply saved.", {
-            "feedback": self.repo._shape_feedback_row(row, None, None),
+            "feedback": shaped,
         }
+
+    def add_discussion_reply(
+        self,
+        *,
+        company_id: int,
+        feedback_id: int,
+        message: str,
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        uid = self.repo._current_user_id()
+        if not uid:
+            return False, "Authentication required.", {}
+
+        feedback = self.repo.get_feedback_by_id(
+            company_id=company_id,
+            feedback_id=feedback_id,
+        )
+        if not feedback:
+            return False, "Feedback not found.", {}
+
+        if not self.repo.material_exists_in_scope(
+            company_id=company_id,
+            material_id=int(feedback.material_id),
+        ):
+            return False, "Material not found.", {}
+
+        ftype = feedback.feedback_type
+        public_types = {
+            MaterialFeedbackTypeEnum.COMMENT,
+            MaterialFeedbackTypeEnum.CLARIFICATION,
+        }
+        if ftype == MaterialFeedbackTypeEnum.BROKEN_FILE:
+            # Private issue threads: only the reporter may reply as a student.
+            if int(feedback.user_id) != int(uid):
+                return False, "You cannot reply to this private report.", {}
+        elif ftype not in public_types:
+            return False, "Replies are only allowed on comments and questions.", {}
+
+        reply = self.repo.add_feedback_reply(
+            company_id=company_id,
+            feedback_id=feedback_id,
+            user_id=int(uid),
+            message=message,
+            set_admin_reply=False,
+        )
+        if not reply:
+            return False, "Could not save reply.", {}
+
+        shaped = self.repo._shape_feedback_row(feedback, None, None)
+        shaped = self.repo._attach_feedback_replies(company_id=company_id, items=[shaped])[0]
+        return True, "Reply posted.", {"feedback": shaped}
 
     def resolve_feedback(
         self,

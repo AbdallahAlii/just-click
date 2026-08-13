@@ -4,7 +4,7 @@ import logging
 import mimetypes
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.inspection import inspect as sa_inspect
@@ -542,14 +542,29 @@ def _ensure_material(
     offering: CourseOffering,
     title: str,
     material_type: MaterialTypeEnum,
-    source_file: Path,
+    source_file: Optional[Path] = None,
+    file_url: Optional[str] = None,
     chapter: Optional[CourseChapter] = None,
     description: Optional[str] = None,
     learning_objectives: Optional[list[str]] = None,
+    page_count: Optional[int] = None,
+    slide_count: Optional[int] = None,
+    file_size_mb: Optional[float] = None,
+    is_downloadable: bool = True,
 ) -> Material:
-    page_count = 12 if material_type == MaterialTypeEnum.PDF else None
-    slide_count = 24 if material_type == MaterialTypeEnum.SLIDES else None
-    file_size_mb = _file_size_mb(source_file)
+    if material_type == MaterialTypeEnum.PDF and page_count is None:
+        page_count = 12
+    if material_type == MaterialTypeEnum.DOC and page_count is None:
+        page_count = 8
+    if material_type == MaterialTypeEnum.SLIDES and slide_count is None:
+        slide_count = 24
+    if source_file is not None and file_size_mb is None:
+        file_size_mb = _file_size_mb(source_file)
+    if material_type == MaterialTypeEnum.LINK:
+        page_count = None
+        slide_count = None
+        file_size_mb = None
+        is_downloadable = False
 
     material, created = _get_or_create(
         db,
@@ -560,13 +575,13 @@ def _ensure_material(
         title=title,
         defaults={
             "material_type": material_type,
-            "file_url": None,
+            "file_url": file_url,
             "page_count": page_count,
             "slide_count": slide_count,
             "file_size_mb": file_size_mb,
             "learning_objectives": learning_objectives,
             "description": description,
-            "is_downloadable": True,
+            "is_downloadable": is_downloadable,
             "is_enabled": True,
             "view_count": 0,
             "download_count": 0,
@@ -582,10 +597,26 @@ def _ensure_material(
             "file_size_mb": file_size_mb,
             "learning_objectives": learning_objectives,
             "description": description,
-            "is_downloadable": True,
+            "is_downloadable": is_downloadable,
             "is_enabled": True,
         },
     )
+
+    if material_type == MaterialTypeEnum.LINK:
+        if not file_url:
+            raise RuntimeError(f"LINK material requires file_url: {title}")
+        _sync_attrs(db, material, {"file_url": file_url})
+        logger.info("%s material: %s", "Created" if created else "Ensured", title)
+        return material
+
+    if source_file is None:
+        raise RuntimeError(f"File-backed material requires source_file: {title}")
+
+    # Idempotent re-seed: skip re-upload when the material already has a stored file.
+    if not created and material.file_url:
+        logger.info("Ensured material (file kept): %s", title)
+        return material
+
     content_type, _ = mimetypes.guess_type(str(source_file))
     new_key = save_file_for(
         folder=MediaFolder.MATERIALS,
@@ -603,6 +634,41 @@ def _ensure_material(
 
     logger.info("%s material: %s", "Created" if created else "Ensured", title)
     return material
+
+
+def _chapter_material_plan(material_spec: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Deterministic ~15 materials/chapter mix:
+    slides, pdf, doc, video, link (no IMAGE/AUDIO/ZIP).
+    """
+    target = int(material_spec.get("materials_per_chapter") or 15)
+    links = list(material_spec.get("link_resources") or [])
+    # First slides title matches legacy seed ("Chapter N Slides") for idempotency.
+    plan: List[Dict[str, Any]] = [
+        {"kind": "slides", "title": "Slides", "slot": 0, "legacy_title": True},
+        {"kind": "pdf", "title": "Reading Notes (PDF)", "slot": 0},
+        {"kind": "doc", "title": "Study Guide", "slot": 0},
+        {"kind": "video", "title": "Lecture Recording", "slot": 0},
+        {"kind": "link", "title": None, "slot": 0},
+        {"kind": "slides", "title": "Worked Examples Slides", "slot": 1},
+        {"kind": "pdf", "title": "Supplementary Notes", "slot": 1},
+        {"kind": "doc", "title": "Practice Worksheet", "slot": 1},
+        {"kind": "video", "title": "Lab Walkthrough Video", "slot": 1},
+        {"kind": "link", "title": None, "slot": 1},
+        {"kind": "slides", "title": "Review Slides", "slot": 2},
+        {"kind": "pdf", "title": "Reference Handout", "slot": 2},
+        {"kind": "doc", "title": "Quiz Prep Document", "slot": 2},
+        {"kind": "link", "title": None, "slot": 2},
+        {"kind": "slides", "title": "Summary Slides", "slot": 3},
+    ]
+    # Ensure link slots map to configured resources
+    link_i = 0
+    for item in plan:
+        if item["kind"] == "link":
+            resource = links[link_i % len(links)] if links else None
+            item["link"] = resource
+            link_i += 1
+    return plan[: max(1, target)]
 
 
 def _seed_materials_for_course(
@@ -633,23 +699,74 @@ def _seed_materials_for_course(
             learning_objectives=["Understand course expectations", "Plan weekly study work"],
         )
 
-    if material_spec.get("include_chapter_slides", True):
-        chapter_type = _material_type_from_str(str(material_spec.get("chapter_material_type") or "slides"))
-        for number, chapter in sorted(chapters.items()):
-            slide_file = _pick_mock_file(
+    if not material_spec.get("include_chapter_slides", True):
+        return
+
+    plan = _chapter_material_plan(material_spec)
+    file_group_by_kind = {
+        "slides": "slide_files",
+        "pdf": "pdf_files",
+        "doc": "doc_files",
+        "video": "video_files",
+    }
+    type_by_kind = {
+        "slides": MaterialTypeEnum.SLIDES,
+        "pdf": MaterialTypeEnum.PDF,
+        "doc": MaterialTypeEnum.DOC,
+        "video": MaterialTypeEnum.VIDEO,
+        "link": MaterialTypeEnum.LINK,
+    }
+
+    for number, chapter in sorted(chapters.items()):
+        for item in plan:
+            kind = item["kind"]
+            slot = int(item.get("slot") or 0)
+            seed = f"{course_code}-chapter-{number}-{kind}-{slot}-{item.get('title') or 'link'}"
+
+            if kind == "link":
+                link = item.get("link") or {}
+                if not link:
+                    continue
+                suffix = str(link.get("title_suffix") or "External Resource")
+                title = f"Chapter {number} — {suffix}"
+                _ensure_material(
+                    db,
+                    company_id=company_id,
+                    offering=offering,
+                    chapter=chapter,
+                    title=title,
+                    material_type=MaterialTypeEnum.LINK,
+                    file_url=str(link["url"]),
+                    description=str(
+                        link.get("description")
+                        or f"External learning resource for {chapter.title}."
+                    ),
+                    learning_objectives=[
+                        f"Explore external references for {chapter.title.lower()}",
+                        "Connect course concepts to reputable documentation",
+                    ],
+                    is_downloadable=False,
+                )
+                continue
+
+            source = _pick_mock_file(
                 material_spec,
-                file_group="slide_files",
-                seed=f"{course_code}-chapter-{number}",
+                file_group=file_group_by_kind[kind],
+                seed=seed,
             )
+            if item.get("legacy_title"):
+                title = f"Chapter {number} Slides"
+            else:
+                title = f"Chapter {number} — {item['title']}"
             _ensure_material(
                 db,
                 company_id=company_id,
                 offering=offering,
                 chapter=chapter,
-                title=f"Chapter {number} Slides",
-                material_type=chapter_type,
-                source_file=slide_file,
-                description=f"{chapter.title} learning material for {course.title}.",
+                title=title,
+                material_type=type_by_kind[kind],
+                source_file=source,
+                description=f"{chapter.title}: {item['title']} for {course.title}.",
                 learning_objectives=[
                     f"Explain {chapter.title.lower()}",
                     "Apply the concept in practical exercises",

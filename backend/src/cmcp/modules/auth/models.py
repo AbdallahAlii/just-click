@@ -69,6 +69,10 @@ class User(BaseModel):
     email_verify_token_hash: Mapped[Optional[str]] = mapped_column(db.String(255), nullable=True, index=True)
     email_verify_expires_at: Mapped[Optional[datetime]] = mapped_column(db.DateTime(timezone=True), nullable=True)
 
+    # Self-service password reset (separate from email verification / temp-password approval)
+    password_reset_token_hash: Mapped[Optional[str]] = mapped_column(db.String(255), nullable=True, index=True)
+    password_reset_expires_at: Mapped[Optional[datetime]] = mapped_column(db.DateTime(timezone=True), nullable=True)
+
     # Admin approval audit
     approved_at: Mapped[Optional[datetime]] = mapped_column(db.DateTime(timezone=True), nullable=True)
     approved_by: Mapped[Optional[int]] = mapped_column(

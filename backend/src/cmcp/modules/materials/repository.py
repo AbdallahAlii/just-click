@@ -16,7 +16,14 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session, selectinload
 from cmcp.config.database import db
 from cmcp.core.base_repo import BaseRepository
-from cmcp.modules.materials.models import Material, StudentMaterialInteraction, MaterialFeedback, MaterialFeedbackTypeEnum, MaterialFeedbackStatusEnum
+from cmcp.modules.materials.models import (
+    Material,
+    StudentMaterialInteraction,
+    MaterialFeedback,
+    MaterialFeedbackReply,
+    MaterialFeedbackTypeEnum,
+    MaterialFeedbackStatusEnum,
+)
 from cmcp.modules.academic.models import (
     Course,
     CourseOffering,  # NEW
@@ -2215,7 +2222,8 @@ class MaterialsRepo:
             .limit(max(1, min(int(limit), 200)))
             .all()
         )
-        return [self._shape_feedback_row(row[0], row[1], row[2]) for row in rows]
+        shaped = [self._shape_feedback_row(row[0], row[1], row[2]) for row in rows]
+        return self._attach_feedback_replies(company_id=company_id, items=shaped)
 
     def get_feedback_admin_summary(self, *, company_id: int) -> Dict[str, Any]:
         base = self.s.query(MaterialFeedback).filter(
@@ -2304,20 +2312,63 @@ class MaterialsRepo:
         out = []
         for fb in rows:
             user = self.s.get(User, int(fb.user_id))
-            prof = (
-                self.s.query(StudentProfile.full_name)
-                .filter(
-                    StudentProfile.company_id == int(company_id),
-                    StudentProfile.user_id == int(fb.user_id),
-                )
-                .first()
+            full_name = self._resolve_user_display_name(
+                company_id=company_id,
+                user_id=int(fb.user_id),
             )
-            item = self._shape_feedback_row(fb, user.username if user else None, prof[0] if prof else None)
+            item = self._shape_feedback_row(fb, user.username if user else None, full_name)
             mat = self.s.get(Material, int(fb.material_id))
             item["material"] = {"id": int(fb.material_id), "title": mat.title if mat else None}
             out.append(item)
 
+        out = self._attach_feedback_replies(company_id=company_id, items=out)
         return out, total, pages
+
+    def get_feedback_by_id(
+        self,
+        *,
+        company_id: int,
+        feedback_id: int,
+    ) -> Optional[MaterialFeedback]:
+        return (
+            self.s.query(MaterialFeedback)
+            .filter(
+                MaterialFeedback.company_id == int(company_id),
+                MaterialFeedback.id == int(feedback_id),
+            )
+            .first()
+        )
+
+    def add_feedback_reply(
+        self,
+        *,
+        company_id: int,
+        feedback_id: int,
+        user_id: int,
+        message: str,
+        set_admin_reply: bool = False,
+    ) -> Optional[MaterialFeedbackReply]:
+        feedback = self.get_feedback_by_id(company_id=company_id, feedback_id=feedback_id)
+        if not feedback:
+            return None
+
+        text = (message or "").strip()
+        if not text:
+            return None
+
+        reply = MaterialFeedbackReply(
+            company_id=int(company_id),
+            feedback_id=int(feedback_id),
+            user_id=int(user_id),
+            message=text,
+        )
+        self.s.add(reply)
+
+        if set_admin_reply:
+            feedback.admin_reply = text
+
+        self.s.flush()
+        return reply
 
     def reply_to_feedback(
         self,
@@ -2327,17 +2378,18 @@ class MaterialsRepo:
         admin_user_id: int,
         admin_reply: str,
     ) -> Optional[MaterialFeedback]:
-        row = (
-            self.s.query(MaterialFeedback)
-            .filter(
-                MaterialFeedback.company_id == int(company_id),
-                MaterialFeedback.id == int(feedback_id),
-            )
-            .first()
-        )
+        row = self.get_feedback_by_id(company_id=company_id, feedback_id=feedback_id)
         if not row:
             return None
-        row.admin_reply = admin_reply.strip()
+        text = admin_reply.strip()
+        row.admin_reply = text
+        self.add_feedback_reply(
+            company_id=company_id,
+            feedback_id=feedback_id,
+            user_id=int(admin_user_id),
+            message=text,
+            set_admin_reply=False,
+        )
         self.s.flush()
         return row
 
@@ -2349,23 +2401,119 @@ class MaterialsRepo:
         admin_user_id: int,
         admin_reply: Optional[str] = None,
     ) -> Optional[MaterialFeedback]:
-        row = (
-            self.s.query(MaterialFeedback)
-            .filter(
-                MaterialFeedback.company_id == int(company_id),
-                MaterialFeedback.id == int(feedback_id),
-            )
-            .first()
-        )
+        row = self.get_feedback_by_id(company_id=company_id, feedback_id=feedback_id)
         if not row:
             return None
         if admin_reply:
-            row.admin_reply = admin_reply.strip()
+            text = admin_reply.strip()
+            row.admin_reply = text
+            self.add_feedback_reply(
+                company_id=company_id,
+                feedback_id=feedback_id,
+                user_id=int(admin_user_id),
+                message=text,
+                set_admin_reply=False,
+            )
         row.status = MaterialFeedbackStatusEnum.RESOLVED
         row.resolved_at = datetime.now(timezone.utc)
         row.resolved_by_user_id = int(admin_user_id)
         self.s.flush()
         return row
+
+    def _resolve_user_display_name(self, *, company_id: int, user_id: int) -> Optional[str]:
+        student = (
+            self.s.query(StudentProfile.full_name)
+            .filter(
+                StudentProfile.company_id == int(company_id),
+                StudentProfile.user_id == int(user_id),
+            )
+            .first()
+        )
+        if student and student[0]:
+            return student[0]
+
+        staff = (
+            self.s.query(StaffProfile.full_name)
+            .filter(
+                StaffProfile.company_id == int(company_id),
+                StaffProfile.user_id == int(user_id),
+            )
+            .first()
+        )
+        if staff and staff[0]:
+            return staff[0]
+        return None
+
+    def _shape_reply_row(
+        self,
+        reply: MaterialFeedbackReply,
+        username: Optional[str],
+        full_name: Optional[str],
+    ) -> Dict[str, Any]:
+        return {
+            "id": int(reply.id),
+            "feedback_id": int(reply.feedback_id),
+            "user_id": int(reply.user_id),
+            "user": {
+                "username": username,
+                "full_name": full_name,
+            },
+            "message": reply.message,
+            "created_at": reply.created_at.isoformat() if reply.created_at else None,
+            "updated_at": reply.updated_at.isoformat() if reply.updated_at else None,
+        }
+
+    def _attach_feedback_replies(
+        self,
+        *,
+        company_id: int,
+        items: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        if not items:
+            return items
+
+        from cmcp.modules.auth.models import User
+
+        feedback_ids = [int(item["id"]) for item in items]
+        reply_rows = (
+            self.s.query(
+                MaterialFeedbackReply,
+                User.username,
+                StudentProfile.full_name,
+                StaffProfile.full_name,
+            )
+            .join(User, User.id == MaterialFeedbackReply.user_id)
+            .outerjoin(
+                StudentProfile,
+                and_(
+                    StudentProfile.user_id == MaterialFeedbackReply.user_id,
+                    StudentProfile.company_id == MaterialFeedbackReply.company_id,
+                ),
+            )
+            .outerjoin(
+                StaffProfile,
+                and_(
+                    StaffProfile.user_id == MaterialFeedbackReply.user_id,
+                    StaffProfile.company_id == MaterialFeedbackReply.company_id,
+                ),
+            )
+            .filter(
+                MaterialFeedbackReply.company_id == int(company_id),
+                MaterialFeedbackReply.feedback_id.in_(feedback_ids),
+            )
+            .order_by(MaterialFeedbackReply.created_at.asc(), MaterialFeedbackReply.id.asc())
+            .all()
+        )
+
+        by_feedback: Dict[int, List[Dict[str, Any]]] = {fid: [] for fid in feedback_ids}
+        for reply, username, student_name, staff_name in reply_rows:
+            by_feedback.setdefault(int(reply.feedback_id), []).append(
+                self._shape_reply_row(reply, username, student_name or staff_name)
+            )
+
+        for item in items:
+            item["replies"] = by_feedback.get(int(item["id"]), [])
+        return items
 
     def _shape_feedback_row(
         self,
@@ -2386,6 +2534,7 @@ class MaterialsRepo:
             "message": row.message,
             "status": row.status.value if row.status else None,
             "admin_reply": row.admin_reply,
+            "replies": [],
             "resolved_at": row.resolved_at.isoformat() if row.resolved_at else None,
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
