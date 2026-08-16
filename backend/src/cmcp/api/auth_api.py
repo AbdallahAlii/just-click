@@ -55,13 +55,14 @@ def _delete_session_cookie(resp):
     cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
     cookie_domain = current_app.config.get("SESSION_COOKIE_DOMAIN", None)
     cookie_path = current_app.config.get("SESSION_COOKIE_PATH", "/")
-
     resp.delete_cookie(
         cookie_name,
         domain=cookie_domain,
         path=cookie_path,
+        secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")),
+        httponly=bool(current_app.config.get("SESSION_COOKIE_HTTPONLY", True)),
+        samesite=current_app.config.get("SESSION_COOKIE_SAMESITE") or "lax",
     )
-
     return resp
 @bp.post("/login")
 @public
@@ -96,12 +97,7 @@ def logout():
         api_success(message=message, data={}) if ok else api_error(message=message, status_code=500)
     )
 
-    cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
-    cookie_domain = current_app.config.get("SESSION_COOKIE_DOMAIN", None)
-    cookie_path = current_app.config.get("SESSION_COOKIE_PATH", "/")
-    resp.delete_cookie(cookie_name, domain=cookie_domain, path=cookie_path)
-
-    return resp
+    return _delete_session_cookie(resp)
 
 
 @bp.get("/me")

@@ -2,7 +2,8 @@
 
 import ButtonPrimary from "@/components/shared/buttons/ButtonPrimary";
 import MobileMenuOpen from "@/components/shared/buttons/MobileMenuOpen";
-import { useLogout, useMe } from "@/features/auth/hooks";
+import { useLogout } from "@/features/auth/hooks";
+import { useSession } from "@/providers/SessionProvider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
@@ -61,10 +62,8 @@ function getWorkspaceConfig(user) {
 
 const NavbarRight = () => {
   const router = useRouter();
-  const { data: meData, isLoading, isError } = useMe();
+  const { user: apiUser, isLoading, isError } = useSession();
   const logoutMutation = useLogout();
-
-  const apiUser = meData?.data?.user;
 
   const user = useMemo(() => {
     if (!apiUser) return fallbackUser;

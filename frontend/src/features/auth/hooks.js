@@ -97,7 +97,6 @@ export function useLogout() {
     onSuccess: async () => {
       qc.setQueryData(authKeys.me(), null);
       qc.removeQueries({ queryKey: authKeys.root });
-      await qc.invalidateQueries();
     },
   });
 }

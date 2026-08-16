@@ -1,22 +1,30 @@
-<!doctype html>
-<html>
-  <body>
-    <p>Hello {{ full_name }},</p>
-
-    <p>Thank you for registering with Jamhuriya University Portal!</p>
-
-    <p><b>Your Student ID:</b> {{ student_id }}</p>
-    <p><b>Registration Status:</b> Pending Email Verification</p>
-
-    <p>To verify your email, please click this link:</p>
-    <p><a href="{{ verify_link }}">{{ verify_link }}</a></p>
-
-    <p>This link expires in {{ expires_minutes }} minutes.</p>
-
-    <p>Once verified, your account will be reviewed by our admin team.</p>
-
-    <p>If you didn't request this, please ignore this email.</p>
-
-    <p>Best regards,<br/>Jamhuriya University IT Department</p>
-  </body>
-</html>
+{% extends "_base.html" %}
+{% block title %}Verify your student email{% endblock %}
+{% block heading %}Confirm your university email{% endblock %}
+{% block body %}
+  <p style="margin:0 0 16px;font-size:16px;line-height:1.7;">Hello {{ full_name }},</p>
+  <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#334155;">
+    Welcome to JustClick. Confirm this email so your faculty can review your
+    student enrolment and grant access to course materials, lectures, and AI study tools.
+  </p>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:24px;">
+    <tr>
+      <td style="padding:18px 20px;">
+        <p style="margin:0 0 8px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Enrolment</p>
+        <p style="margin:0 0 8px;font-size:15px;"><strong>Student ID:</strong> {{ student_id }}</p>
+        <p style="margin:0;font-size:15px;"><strong>Status:</strong> Pending email verification</p>
+      </td>
+    </tr>
+  </table>
+  <p style="margin:0 0 24px;text-align:center;">
+    <a href="{{ verify_link }}" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 28px;border-radius:8px;">Verify my email</a>
+  </p>
+  <p style="margin:0 0 12px;font-size:13px;color:#64748b;line-height:1.7;">
+    This link expires in {{ expires_minutes }} minutes. After verification, an administrator
+    will approve your account before you can sign in.
+  </p>
+  <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.6;word-break:break-all;">
+    If the button does not work, copy this link:<br/>{{ verify_link }}
+  </p>
+{% endblock %}
+{% block footer_extra %}If you did not register, you can ignore this message.{% endblock %}

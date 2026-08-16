@@ -1,2 +1,17 @@
+.idea/
 .idea/backend/.env
+
+# Backend secrets, venv, runtime data
 backend/.env
+backend/.venv/
+backend/media/
+backend/instance/chroma_db/
+backend/instance/embedding_models/
+backend/instance/
+
+# Frontend secrets and build output
+frontend/.env
+frontend/.env.production
+frontend/.env.local
+frontend/.next/
+frontend/node_modules/

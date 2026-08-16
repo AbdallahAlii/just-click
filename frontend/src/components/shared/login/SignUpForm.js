@@ -2,19 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { FiInfo, FiMail, FiUser } from "react-icons/fi";
-import { HiOutlineIdentification } from "react-icons/hi";
 
 import AsyncDropdown from "@/components/shared/inputs/AsyncDropdown";
+import { useLogout } from "@/features/auth/hooks";
 import { useRegisterStudent } from "@/features/signup/hooks";
 import { getApiErrorMessage, isValidEmail } from "@/lib/apiErrors";
 import { useDropdown } from "@/hooks/dropdown/useDropdown";
+import { useSession } from "@/providers/SessionProvider";
 
 const SignUpForm = () => {
   const router = useRouter();
   const registerMut = useRegisterStudent();
+  const logoutMut = useLogout();
+  const { user } = useSession();
+  const clearedSessionRef = useRef(false);
 
   const [selectedFaculty, setSelectedFaculty] = useState("");
 
@@ -27,6 +30,12 @@ const SignUpForm = () => {
     accept_terms: false,
   });
   const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    if (!user || clearedSessionRef.current || logoutMut.isPending) return;
+    clearedSessionRef.current = true;
+    logoutMut.mutateAsync().catch(() => {});
+  }, [user, logoutMut]);
 
   const onChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -138,6 +147,14 @@ const SignUpForm = () => {
     }
 
     try {
+      if (user) {
+        try {
+          await logoutMut.mutateAsync();
+        } catch {
+          /* still submit signup after a leftover session */
+        }
+      }
+
       const payload = {
         student_id: trimmedStudentId,
         email: trimmedEmail,
@@ -170,124 +187,117 @@ const SignUpForm = () => {
   };
 
   const labelCls =
-    "block text-[13px] font-semibold text-gray-700 dark:text-gray-300 mb-2";
-
-  const inputWrap =
-    "relative group rounded-2xl border border-gray-200 dark:border-gray-700 " +
-    "bg-white/70 dark:bg-gray-900/40 " +
-    "transition overflow-hidden " +
-    "focus-within:border-primaryColor/40 focus-within:ring-4 focus-within:ring-primaryColor/10";
+    "block text-[12.5px] font-medium text-ds-text-secondary mb-1.5";
 
   const inputCls =
-    "w-full h-12 pl-12 pr-4 text-sm bg-transparent outline-none " +
-    "text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500";
-
-  const iconCls =
-    "absolute left-4 top-1/2 -translate-y-1/2 text-[20px] text-gray-400 " +
-    "transition group-focus-within:text-primaryColor";
+    "w-full h-11 rounded-lg border border-ds-border " +
+    "bg-ds-surface-input px-3.5 text-sm text-ds-text-primary " +
+    "placeholder:text-ds-text-muted " +
+    "focus:outline-none focus:border-ds-action/50 focus:ring-4 focus:ring-ds-action/10 transition";
 
   const selectCls =
-    "w-full h-12 px-4 text-sm rounded-2xl border border-gray-200 dark:border-gray-700 " +
-    "bg-white/70 dark:bg-gray-900/40 text-gray-900 dark:text-white " +
-    "focus:outline-none focus:border-primaryColor/40 focus:ring-4 focus:ring-primaryColor/10 transition appearance-none";
+    "w-full h-11 rounded-lg border border-ds-border " +
+    "bg-ds-surface-input px-3.5 pr-10 text-sm text-ds-text-primary " +
+    "placeholder:text-ds-text-muted " +
+    "focus:outline-none focus:border-ds-action/50 focus:ring-4 focus:ring-ds-action/10 transition";
+
+  const btnBase =
+    "w-full h-11 rounded-lg text-white text-sm font-semibold transition " +
+    "focus:outline-none focus:ring-4 focus:ring-ds-action/20";
+
+  const btnEnabled = "bg-ds-action hover:bg-ds-action-hover";
+  const btnDisabled = "bg-ds-action/60 cursor-not-allowed";
 
   return (
-    <div className="transition-all duration-150 ease-linear">
-      <div className="text-center mb-7">
-        <h2 className="text-2xl md:text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">
+    <div className="w-full">
+      <div className="mb-5">
+        <h2 className="text-xl font-semibold text-ds-text-primary">
           Create account
         </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-sm text-ds-text-muted">
           Already registered?{" "}
           <Link
             href="/login"
-            className="text-primaryColor font-semibold hover:underline"
+            className="font-semibold text-ds-action hover:underline"
           >
             Sign in
           </Link>
         </p>
       </div>
 
-      <div className="mb-7 px-4 py-3 rounded-2xl border border-primaryColor/15 bg-primaryColor/5 flex items-start gap-3">
-        <FiInfo className="text-primaryColor text-lg mt-0.5 flex-shrink-0" />
-        <p className="text-sm text-gray-700 dark:text-gray-200">
-          No password needed – we&apos;ll email you a secure link to activate
-          your account.
-        </p>
+      <div className="mb-5 rounded-xl border border-ds-action/25 bg-ds-action/10 px-4 py-3 text-sm text-ds-text-primary">
+        No password yet. We will email a verification link so you can activate
+        your student account.
       </div>
 
       {formError ? (
         <div
           role="alert"
-          className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+          className="mb-4 rounded-xl border border-ds-error/30 bg-ds-error/10 px-4 py-3 text-sm text-ds-error"
         >
           {formError}
         </div>
       ) : null}
 
-      <form onSubmit={onSubmit} className="space-y-5">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="md:col-span-2">
-            <label className={labelCls}>
-              Student ID <span className="text-red-400">*</span>
+      <form onSubmit={onSubmit} className="space-y-3.5">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-5">
+          <div className="sm:col-span-2">
+            <label className={labelCls} htmlFor="student_id">
+              Student ID <span className="text-ds-error">*</span>
             </label>
-            <div className={inputWrap}>
-              <HiOutlineIdentification className={iconCls} />
-              <input
-                name="student_id"
-                value={form.student_id}
-                onChange={onChange}
-                type="text"
-                placeholder="C123456"
-                className={inputCls}
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
-
-          <div className="md:col-span-3">
-            <label className={labelCls}>
-              Full name <span className="text-red-400">*</span>
-            </label>
-            <div className={inputWrap}>
-              <FiUser className={iconCls} />
-              <input
-                name="full_name"
-                value={form.full_name}
-                onChange={onChange}
-                type="text"
-                placeholder="Falastiin Ahmed"
-                className={inputCls}
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label className={labelCls}>
-            Student email <span className="text-red-400">*</span>
-          </label>
-          <div className={inputWrap}>
-            <FiMail className={iconCls} />
             <input
-              name="student_email"
-              value={form.student_email}
+              id="student_id"
+              name="student_id"
+              value={form.student_id}
               onChange={onChange}
-              type="email"
-              placeholder="student@university.edu"
+              type="text"
+              placeholder="C123456"
               className={inputCls}
               disabled={isSubmitting}
+              autoComplete="username"
+            />
+          </div>
+
+          <div className="sm:col-span-3">
+            <label className={labelCls} htmlFor="full_name">
+              Full name <span className="text-ds-error">*</span>
+            </label>
+            <input
+              id="full_name"
+              name="full_name"
+              value={form.full_name}
+              onChange={onChange}
+              type="text"
+              placeholder="Falastiin Ahmed"
+              className={inputCls}
+              disabled={isSubmitting}
+              autoComplete="name"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className={labelCls} htmlFor="student_email">
+            Student email <span className="text-ds-error">*</span>
+          </label>
+          <input
+            id="student_email"
+            name="student_email"
+            value={form.student_email}
+            onChange={onChange}
+            type="email"
+            placeholder="student@university.edu"
+            className={inputCls}
+            disabled={isSubmitting}
+            autoComplete="email"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
           <div>
             <label className={labelCls}>
-              Faculty <span className="text-red-400">*</span>
+              Faculty <span className="text-ds-error">*</span>
             </label>
-
             <AsyncDropdown
               value={selectedFaculty}
               onChange={handleFacultyPick}
@@ -304,9 +314,8 @@ const SignUpForm = () => {
 
           <div>
             <label className={labelCls}>
-              Department <span className="text-red-400">*</span>
+              Department <span className="text-ds-error">*</span>
             </label>
-
             <AsyncDropdown
               key={`department-${selectedFaculty || "none"}`}
               value={form.department_id}
@@ -332,9 +341,8 @@ const SignUpForm = () => {
 
         <div>
           <label className={labelCls}>
-            Current semester <span className="text-red-400">*</span>
+            Current semester <span className="text-ds-error">*</span>
           </label>
-
           <AsyncDropdown
             value={form.semester_id}
             onChange={(val) => {
@@ -362,24 +370,21 @@ const SignUpForm = () => {
             name="accept_terms"
             checked={form.accept_terms}
             onChange={onChange}
-            className="w-5 h-5 mt-0.5 rounded-md border-gray-300 text-primaryColor focus:ring-primaryColor/20"
+            className="mt-0.5 h-4 w-4 rounded border-ds-border text-ds-action focus:ring-ds-action/20"
             disabled={isSubmitting}
           />
-          <label
-            htmlFor="terms"
-            className="text-sm text-gray-600 dark:text-gray-400"
-          >
+          <label htmlFor="terms" className="text-sm text-ds-text-secondary">
             I agree to the{" "}
             <Link
               href="/terms"
-              className="text-ds-action font-semibold hover:underline"
+              className="font-semibold text-ds-action hover:underline"
             >
               Terms
             </Link>{" "}
             and{" "}
             <Link
               href="/privacy"
-              className="text-ds-action font-semibold hover:underline"
+              className="font-semibold text-ds-action hover:underline"
             >
               Privacy Policy
             </Link>
@@ -391,12 +396,7 @@ const SignUpForm = () => {
           type="submit"
           disabled={isSubmitDisabled}
           aria-disabled={isSubmitDisabled}
-          className={
-            "w-full h-12 rounded-2xl text-white text-sm font-semibold transition shadow-sm focus:outline-none focus:ring-4 " +
-            (isSubmitDisabled
-              ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed focus:ring-gray-200"
-              : "bg-primaryColor hover:bg-primaryColor/90 focus:ring-primaryColor/20")
-          }
+          className={`${btnBase} ${isSubmitDisabled ? btnDisabled : btnEnabled}`}
         >
           {isSubmitting ? "Submitting..." : "Create account"}
         </button>

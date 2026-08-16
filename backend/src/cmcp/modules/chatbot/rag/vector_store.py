@@ -108,3 +108,16 @@ def delete_material_chunks(company_id: int, material_id: int) -> int:
     if ids:
         coll.delete(ids=ids)
     return len(ids)
+
+
+def delete_company_chunks(company_id: int) -> int:
+    coll = get_collection()
+    res = coll.get(where={"company_id": int(company_id)}, include=[])
+    ids = res.get("ids") or []
+    if ids:
+        coll.delete(ids=ids)
+    return len(ids)
+
+
+def release_vector_store() -> None:
+    get_collection.cache_clear()

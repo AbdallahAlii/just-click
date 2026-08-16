@@ -435,9 +435,8 @@ const CoursesPrimary = ({ isNotSidebar, isList }) => {
   ].filter(Boolean).length;
 
   const isInitialLoading = isLoading && !data?.pages?.length;
-  const hasExistingData = !!data?.pages?.length;
   const showUpdating =
-    isFetching && !isFetchingNextPage && !isInitialLoading && hasExistingData;
+    isFetching && !isFetchingNextPage && !isInitialLoading;
   const isListView = isList || viewMode === "list";
 
   const handleSemesterChange = (semId) => {

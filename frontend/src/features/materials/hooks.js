@@ -80,7 +80,7 @@ export function useInfiniteMaterialsList(baseParams = {}, options = {}) {
       }
       return undefined;
     },
-    placeholderData: (previousData) => previousData,
+    placeholderData: undefined,
     staleTime: 1000 * 45,
     refetchOnWindowFocus: false,
     ...options,

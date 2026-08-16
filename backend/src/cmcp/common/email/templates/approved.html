@@ -1,30 +1,32 @@
-<!doctype html>
-<html>
-  <body>
-    <p>Congratulations {{ full_name }}!</p>
-
-    <p>Your account has been approved by the administration.</p>
-
-    <p><b>Username/Student ID:</b> {{ student_id }}</p>
-    <p><b>Temporary Password:</b> {{ temp_password }}</p>
-
-    <p>Login here: <a href="{{ login_link }}">{{ login_link }}</a></p>
-
-    <p><b>IMPORTANT:</b></p>
-    <ol>
-      <li>You MUST change your password on first login</li>
-      <li>This temporary password expires in {{ expires_hours }} hours</li>
-      <li>Keep your Student ID confidential</li>
-    </ol>
-
-    <p>Access will be based on:</p>
-    <ul>
-      <li>Faculty: {{ faculty_name }}</li>
-      <li>Department: {{ department_name }}</li>
-    </ul>
-
-    <p>If you have questions, contact: it-support@jamhuriya.edu</p>
-
-    <p>Welcome to Jamhuriya University Portal!</p>
-  </body>
-</html>
+{% extends "_base.html" %}
+{% block title %}Your student account is ready{% endblock %}
+{% block heading %}You are approved to start learning{% endblock %}
+{% block body %}
+  <p style="margin:0 0 16px;font-size:16px;line-height:1.7;">Hello {{ full_name }},</p>
+  <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#334155;">
+    Your JustClick student account has been approved. Sign in to open your semester
+    materials, lecture notes, and study resources.
+  </p>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:24px;">
+    <tr>
+      <td style="padding:18px 20px;">
+        <p style="margin:0 0 10px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Sign-in details</p>
+        <p style="margin:0 0 8px;font-size:15px;"><strong>Username / Student ID:</strong> {{ student_id }}</p>
+        <p style="margin:0 0 8px;font-size:15px;"><strong>Temporary password:</strong> {{ temp_password }}</p>
+        {% if faculty_name %}
+        <p style="margin:0 0 8px;font-size:15px;"><strong>Faculty:</strong> {{ faculty_name }}</p>
+        {% endif %}
+        {% if department_name %}
+        <p style="margin:0;font-size:15px;"><strong>Department:</strong> {{ department_name }}</p>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+  <p style="margin:0 0 24px;text-align:center;">
+    <a href="{{ login_link }}" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 28px;border-radius:8px;">Open JustClick</a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;line-height:1.7;">
+    Change this temporary password after your first sign-in. It expires in {{ expires_hours }} hours.
+    Keep your Student ID private.
+  </p>
+{% endblock %}

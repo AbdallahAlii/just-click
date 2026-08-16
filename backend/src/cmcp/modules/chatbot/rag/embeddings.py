@@ -69,3 +69,20 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
 
 def embed_query(query: str) -> list[float]:
     return embed_texts([query])[0]
+
+
+def release_embedding_model() -> None:
+    get_embedding_model.cache_clear()
+    try:
+        import gc
+
+        gc.collect()
+    except Exception:
+        pass
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass

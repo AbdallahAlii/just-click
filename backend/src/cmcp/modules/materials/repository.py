@@ -38,6 +38,17 @@ from cmcp.modules.education_people.models import StudentProfile, StaffProfile
 log = logging.getLogger(__name__)
 
 
+def _ilike_pattern(search: str) -> str:
+    escaped = (
+        (search or "")
+        .strip()
+        .replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+    return f"%{escaped}%"
+
+
 @dataclass
 class MaterialListRow:
     """
@@ -386,15 +397,17 @@ class MaterialsRepo:
         if filters.get("uploaded_to"):
             stmt = stmt.where(Material.created_at <= filters["uploaded_to"])
 
-        # Search in title, description, course title, chapter title
         search = (filters.get("search") or "").strip()
         if search:
-            like = f"%{search.lower()}%"
+            pattern = _ilike_pattern(search)
             stmt = stmt.where(
-                func.lower(func.coalesce(Material.title, "")).like(like)
-                | func.lower(func.coalesce(Material.description, "")).like(like)
-                | func.lower(func.coalesce(Course.title, "")).like(like)
-                | func.lower(func.coalesce(CourseChapter.title, "")).like(like)
+                or_(
+                    func.coalesce(Material.title, "").ilike(pattern, escape="\\"),
+                    func.coalesce(Material.description, "").ilike(pattern, escape="\\"),
+                    func.coalesce(Course.title, "").ilike(pattern, escape="\\"),
+                    func.coalesce(Course.code, "").ilike(pattern, escape="\\"),
+                    func.coalesce(CourseChapter.title, "").ilike(pattern, escape="\\"),
+                )
             )
 
         return stmt
@@ -807,10 +820,12 @@ class MaterialsRepo:
 
         search = (filters.get("search") or "").strip()
         if search:
-            like = f"%{search.lower()}%"
+            pattern = _ilike_pattern(search)
             stmt = stmt.where(
-                func.lower(func.coalesce(Material.title, "")).like(like)
-                | func.lower(func.coalesce(Material.description, "")).like(like)
+                or_(
+                    func.coalesce(Material.title, "").ilike(pattern, escape="\\"),
+                    func.coalesce(Material.description, "").ilike(pattern, escape="\\"),
+                )
             )
 
         return stmt
@@ -1277,15 +1292,17 @@ class MaterialsRepo:
 
         search = (filters.get("search") or "").strip()
         if search:
-            like = f"%{search.lower()}%"
+            pattern = _ilike_pattern(search)
             stmt = stmt.where(
-                func.lower(func.coalesce(Material.title, "")).like(like)
-                | func.lower(func.coalesce(Material.description, "")).like(like)
-                | func.lower(func.coalesce(Course.title, "")).like(like)
-                | func.lower(func.coalesce(Course.code, "")).like(like)
-                | func.lower(func.coalesce(CourseChapter.title, "")).like(like)
-                | func.lower(func.coalesce(Department.name, "")).like(like)
-                | func.lower(func.coalesce(Faculty.name, "")).like(like)
+                or_(
+                    func.coalesce(Material.title, "").ilike(pattern, escape="\\"),
+                    func.coalesce(Material.description, "").ilike(pattern, escape="\\"),
+                    func.coalesce(Course.title, "").ilike(pattern, escape="\\"),
+                    func.coalesce(Course.code, "").ilike(pattern, escape="\\"),
+                    func.coalesce(CourseChapter.title, "").ilike(pattern, escape="\\"),
+                    func.coalesce(Department.name, "").ilike(pattern, escape="\\"),
+                    func.coalesce(Faculty.name, "").ilike(pattern, escape="\\"),
+                )
             )
 
         return stmt

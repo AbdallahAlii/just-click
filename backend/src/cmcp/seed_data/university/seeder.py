@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.inspection import inspect as sa_inspect
 from sqlalchemy.orm import Session
 
@@ -638,30 +638,21 @@ def _ensure_material(
 
 def _chapter_material_plan(material_spec: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
-    Deterministic ~15 materials/chapter mix:
-    slides, pdf, doc, video, link (no IMAGE/AUDIO/ZIP).
+    Compact deterministic mix: slides, pdf, doc, link.
+    Videos are attached separately and capped university-wide.
     """
-    target = int(material_spec.get("materials_per_chapter") or 15)
+    target = int(material_spec.get("materials_per_chapter") or 6)
     links = list(material_spec.get("link_resources") or [])
-    # First slides title matches legacy seed ("Chapter N Slides") for idempotency.
     plan: List[Dict[str, Any]] = [
         {"kind": "slides", "title": "Slides", "slot": 0, "legacy_title": True},
         {"kind": "pdf", "title": "Reading Notes (PDF)", "slot": 0},
         {"kind": "doc", "title": "Study Guide", "slot": 0},
-        {"kind": "video", "title": "Lecture Recording", "slot": 0},
         {"kind": "link", "title": None, "slot": 0},
-        {"kind": "slides", "title": "Worked Examples Slides", "slot": 1},
         {"kind": "pdf", "title": "Supplementary Notes", "slot": 1},
         {"kind": "doc", "title": "Practice Worksheet", "slot": 1},
-        {"kind": "video", "title": "Lab Walkthrough Video", "slot": 1},
+        {"kind": "slides", "title": "Review Slides", "slot": 1},
         {"kind": "link", "title": None, "slot": 1},
-        {"kind": "slides", "title": "Review Slides", "slot": 2},
-        {"kind": "pdf", "title": "Reference Handout", "slot": 2},
-        {"kind": "doc", "title": "Quiz Prep Document", "slot": 2},
-        {"kind": "link", "title": None, "slot": 2},
-        {"kind": "slides", "title": "Summary Slides", "slot": 3},
     ]
-    # Ensure link slots map to configured resources
     link_i = 0
     for item in plan:
         if item["kind"] == "link":
@@ -679,8 +670,10 @@ def _seed_materials_for_course(
     course: Course,
     chapters: Dict[int, CourseChapter],
     material_spec: Dict[str, Any],
+    video_budget: List[int],
 ) -> None:
     course_code = str(course.code or course.id).lower()
+    max_videos = int(material_spec.get("max_video_materials") or 2)
 
     if material_spec.get("include_course_syllabus", True):
         pdf_file = _pick_mock_file(
@@ -772,6 +765,32 @@ def _seed_materials_for_course(
                     "Apply the concept in practical exercises",
                 ],
             )
+
+        if number == 1 and video_budget[0] < max_videos and material_spec.get("video_files"):
+            try:
+                source = _pick_mock_file(
+                    material_spec,
+                    file_group="video_files",
+                    seed=f"{course_code}-chapter-{number}-video-0",
+                )
+            except RuntimeError as exc:
+                logger.warning("Skipping seed video (fixture missing): %s", exc)
+            else:
+                _ensure_material(
+                    db,
+                    company_id=company_id,
+                    offering=offering,
+                    chapter=chapter,
+                    title=f"Chapter {number} — Lecture Recording",
+                    material_type=MaterialTypeEnum.VIDEO,
+                    source_file=source,
+                    description=f"Short lecture walkthrough for {chapter.title} in {course.title}.",
+                    learning_objectives=[
+                        f"Follow the lecture for {chapter.title.lower()}",
+                        "Review the demonstration before lab work",
+                    ],
+                )
+                video_budget[0] += 1
 
 
 def _resolve_faculty(profile: Dict[str, Any], faculty_by_code: Dict[str, Faculty]) -> Faculty:
@@ -965,6 +984,7 @@ def _seed_one_university(db: Session, spec: Dict[str, Any]) -> None:
 
     chapters_template = academic.get("chapters_per_course", [])
     material_spec = academic.get("materials", {})
+    video_budget = [0]
     for course_spec in academic.get("courses", []):
         semester = sem_by_number.get(int(course_spec["semester_number"]))
         if not semester:
@@ -998,6 +1018,7 @@ def _seed_one_university(db: Session, spec: Dict[str, Any]) -> None:
             course=course,
             chapters=chapters,
             material_spec=material_spec,
+            video_budget=video_budget,
         )
 
     for student_spec in _student_specs(spec):
@@ -1035,4 +1056,5 @@ def seed_university(db: Session) -> None:
     logger.info("Seeding UNIVERSITY demo data...")
     for spec in UNIVERSITIES:
         _seed_one_university(db, spec)
-    logger.info("University demo seeding complete.")
+    total = int(db.scalar(select(func.count()).select_from(Material)) or 0)
+    logger.info("University demo seeding complete. materials=%s", total)

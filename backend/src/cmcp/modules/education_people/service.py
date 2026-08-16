@@ -253,7 +253,7 @@ class EducationPeopleService:
 
                 self.email_svc.enqueue(
                     to_email=user.email,
-                    subject="Verify Your Jamhuriya University Account",
+                    subject="Verify your JustClick student email",
                     template="verify_email",
                     payload={
                         "full_name": prof.full_name,

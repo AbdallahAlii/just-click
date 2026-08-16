@@ -43,7 +43,19 @@ async function proxy(req, ctx) {
       redirect: "manual",
     });
 
-    const resHeaders = new Headers(upstream.headers);
+    const resHeaders = new Headers();
+    upstream.headers.forEach((value, key) => {
+      if (key.toLowerCase() === "set-cookie") return;
+      resHeaders.append(key, value);
+    });
+    const setCookies =
+      typeof upstream.headers.getSetCookie === "function"
+        ? upstream.headers.getSetCookie()
+        : [];
+    for (const cookie of setCookies) {
+      resHeaders.append("set-cookie", cookie);
+    }
+
     const data = await upstream.arrayBuffer();
 
     return new NextResponse(data, { status: upstream.status, headers: resHeaders });

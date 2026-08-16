@@ -38,7 +38,9 @@ def create_app() -> Flask:
     # --- ADD THESE TWO LINES ---
 
     from cmcp.cli.seed_command import seed_cli
+    from cmcp.cli.demo_reset import demo_reset_cli
     app.cli.add_command(seed_cli)
+    app.cli.add_command(demo_reset_cli)
     # ---------------------------
     # ------------------------------------------------------------------
     # Core config

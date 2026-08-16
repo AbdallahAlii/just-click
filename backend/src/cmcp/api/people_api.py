@@ -5,7 +5,7 @@ import os
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlencode
 
-from flask import Blueprint, request
+from flask import Blueprint, request, session, make_response, current_app
 
 from cmcp.api.material_api import _external_base
 from cmcp.common.api_response import api_success, api_error
@@ -197,7 +197,24 @@ def public_student_register():
         ok, msg, out = svc.register_student(company_id=company_id, data=payload.model_dump())
 
         _commit_ok(ok)
-        return api_success(message=msg, data=out, status_code=201) if ok else api_error(msg, status_code=400)
+
+        session.clear()
+        session.permanent = False
+
+        if not ok:
+            return api_error(msg, status_code=400)
+
+        resp = make_response(api_success(message=msg, data=out, status_code=201))
+        cookie_name = current_app.config.get("SESSION_COOKIE_NAME", "session")
+        resp.delete_cookie(
+            cookie_name,
+            domain=current_app.config.get("SESSION_COOKIE_DOMAIN", None),
+            path=current_app.config.get("SESSION_COOKIE_PATH", "/"),
+            secure=bool(current_app.config.get("SESSION_COOKIE_SECURE")),
+            httponly=bool(current_app.config.get("SESSION_COOKIE_HTTPONLY", True)),
+            samesite=current_app.config.get("SESSION_COOKIE_SAMESITE") or "lax",
+        )
+        return resp
 
     except Exception as e:
         return _handle_error(e)

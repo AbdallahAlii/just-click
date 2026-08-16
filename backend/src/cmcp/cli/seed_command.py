@@ -56,6 +56,10 @@ def seed_all() -> None:
 
         db.session.commit()
         click.secho("✅ All data seeded successfully!", fg="green")
+        from sqlalchemy import func, select
+        from cmcp.modules.materials.models import Material
+        total = int(db.session.scalar(select(func.count()).select_from(Material)) or 0)
+        click.echo(f"edu_materials count: {total}")
 
     except Exception as e:
         db.session.rollback()

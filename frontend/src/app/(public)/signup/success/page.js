@@ -1,59 +1,78 @@
 import Link from "next/link";
+import ThemeController from "@/components/shared/others/ThemeController";
+
+export const metadata = {
+  title: "Registration submitted | JustClick",
+  description: "Check your email to verify your JustClick student account.",
+};
 
 export default function SignupSuccessPage({ searchParams }) {
-  const message = searchParams?.message || "Registration submitted. Please check your email.";
+  const message =
+    searchParams?.message ||
+    "Registration submitted. Please check your university email.";
   const email = searchParams?.email || "";
   const status = searchParams?.status || "";
   const studentId = searchParams?.student_id || "";
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/40 p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-          Check your email
-        </h1>
-
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-          {message}
-        </p>
-
-        <div className="mt-5 space-y-2 text-sm">
-          {email ? (
-            <div className="flex justify-between gap-3">
-              <span className="text-gray-500 dark:text-gray-400">Email</span>
-              <span className="text-gray-900 dark:text-white font-medium">{email}</span>
-            </div>
-          ) : null}
-          {studentId ? (
-            <div className="flex justify-between gap-3">
-              <span className="text-gray-500 dark:text-gray-400">Student ID</span>
-              <span className="text-gray-900 dark:text-white font-medium">{studentId}</span>
-            </div>
-          ) : null}
-          {status ? (
-            <div className="flex justify-between gap-3">
-              <span className="text-gray-500 dark:text-gray-400">Status</span>
-              <span className="text-gray-900 dark:text-white font-medium">{status}</span>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="mt-6 flex gap-3">
-          <Link
-            href="/login"
-            className="flex-1 h-11 rounded-xl bg-primaryColor hover:bg-primaryColor/90 text-white text-sm font-semibold flex items-center justify-center"
-          >
-            Go to login
-          </Link>
-
+    <main className="bg-ds-page">
+      <ThemeController />
+      <section className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-md flex-col justify-center px-6 py-12 sm:px-8 md:min-h-[calc(100vh-10rem)] md:py-16">
+        <div className="mb-8 text-center">
           <Link
             href="/"
-            className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-semibold flex items-center justify-center text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-800"
+            className="inline-flex items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ds-action"
           >
-            Back home
+            <span className="text-3xl font-bold tracking-tight">
+              <span className="text-ds-text-primary">Just</span>
+              <span className="text-ds-action">Click</span>
+            </span>
           </Link>
         </div>
-      </div>
-    </div>
+
+        <div className="rounded-2xl border border-ds-border bg-ds-surface p-6 sm:p-8 shadow-sm">
+          <h1 className="text-xl font-semibold text-ds-text-primary">
+            Check your email
+          </h1>
+          <p className="mt-2 text-sm text-ds-text-muted">{message}</p>
+
+          <div className="mt-5 space-y-2 text-sm">
+            {email ? (
+              <div className="flex justify-between gap-3">
+                <span className="text-ds-text-muted">Email</span>
+                <span className="font-medium text-ds-text-primary">{email}</span>
+              </div>
+            ) : null}
+            {studentId ? (
+              <div className="flex justify-between gap-3">
+                <span className="text-ds-text-muted">Student ID</span>
+                <span className="font-medium text-ds-text-primary">{studentId}</span>
+              </div>
+            ) : null}
+            {status ? (
+              <div className="flex justify-between gap-3">
+                <span className="text-ds-text-muted">Status</span>
+                <span className="font-medium text-ds-text-primary">{status}</span>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <Link
+              href="/login"
+              className="inline-flex h-11 w-full items-center justify-center rounded-lg bg-ds-action text-sm font-semibold text-white hover:bg-ds-action-hover transition"
+            >
+              Go to login
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex h-11 w-full items-center justify-center rounded-lg border border-ds-border text-sm font-semibold text-ds-text-primary hover:bg-ds-surface-hover transition"
+            >
+              Back home
+            </Link>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

@@ -1,28 +1,12 @@
-<!doctype html>
-<html lang="en">
-  <body style="margin:0;padding:0;background:#f4f6f8;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6f8;padding:24px 12px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;">
-            <tr>
-              <td style="background:#0f766e;padding:24px 28px;">
-                <h1 style="margin:0;color:#fff;font-size:22px;">New Contact Us message</h1>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:28px;">
-                <p><strong>From:</strong> {{ name }} &lt;{{ email }}&gt;</p>
-                <p><strong>Subject:</strong> {{ subject }}</p>
-                <p><strong>Reference:</strong> #{{ contact_id }}</p>
-                <p><strong>Received:</strong> {{ created_at }}</p>
-                <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
-                <p style="white-space:pre-wrap;">{{ message }}</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
+{% extends "_base.html" %}
+{% block title %}New Contact Us message{% endblock %}
+{% block heading %}New Contact Us message{% endblock %}
+{% block body %}
+  <p style="margin:0 0 16px;font-size:15px;line-height:1.7;"><strong>From:</strong> {{ name }} &lt;{{ email }}&gt;</p>
+  <p style="margin:0 0 8px;font-size:15px;"><strong>Subject:</strong> {{ subject }}</p>
+  <p style="margin:0 0 8px;font-size:15px;"><strong>Reference:</strong> #{{ contact_id }}</p>
+  <p style="margin:0 0 20px;font-size:15px;"><strong>Received:</strong> {{ created_at }}</p>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;">
+    <p style="margin:0;font-size:15px;line-height:1.7;white-space:pre-wrap;">{{ message }}</p>
+  </div>
+{% endblock %}

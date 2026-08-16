@@ -1,58 +1,31 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Material updated</title>
-  </head>
-  <body style="margin:0;padding:0;background:#f4f6f8;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6f8;padding:24px 12px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(15,23,42,0.08);">
-            <tr>
-              <td style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);padding:24px 28px;">
-                <p style="margin:0;color:#dbeafe;font-size:13px;letter-spacing:0.04em;text-transform:uppercase;">JustClick · Jamhuriya University</p>
-                <h1 style="margin:8px 0 0;color:#ffffff;font-size:24px;line-height:1.3;">Study material updated</h1>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:28px;">
-                <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Hello {{ full_name }},</p>
-                <p style="margin:0 0 20px;font-size:15px;line-height:1.7;">
-                  A study material you follow has been updated with new content.
-                </p>
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:24px;">
-                  <tr>
-                    <td style="padding:18px 20px;">
-                      <p style="margin:0 0 8px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;">Updated material</p>
-                      <p style="margin:0 0 12px;font-size:18px;font-weight:600;color:#0f172a;">{{ material_title }}</p>
-                      <p style="margin:0 0 6px;font-size:14px;"><strong>Course:</strong> {{ course_code }} · {{ course_title }}</p>
-                      {% if department_name %}
-                      <p style="margin:0 0 6px;font-size:14px;"><strong>Department:</strong> {{ department_name }}</p>
-                      {% endif %}
-                      {% if material_type %}
-                      <p style="margin:0;font-size:14px;"><strong>Type:</strong> {{ material_type }}</p>
-                      {% endif %}
-                    </td>
-                  </tr>
-                </table>
-                <p style="margin:0 0 24px;text-align:center;">
-                  <a href="{{ material_link }}" style="display:inline-block;background:#1d4ed8;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 24px;border-radius:8px;">View updated material</a>
-                </p>
-                <p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;">
-                  Open the link above to see the latest version. If the button does not work, copy this link: {{ material_link }}
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:18px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;">
-                <p style="margin:0;font-size:12px;color:#94a3b8;">Jamhuriya University IT Department · it-support@jamhuriya.edu</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>
+{% extends "_base.html" %}
+{% block title %}Study material updated{% endblock %}
+{% block heading %}A course material was updated{% endblock %}
+{% block body %}
+  <p style="margin:0 0 16px;font-size:16px;line-height:1.7;">Hello {{ full_name }},</p>
+  <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#334155;">
+    A study file you follow has a new version. Review the latest notes so you stay aligned
+    with class.
+  </p>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:24px;">
+    <tr>
+      <td style="padding:18px 20px;">
+        <p style="margin:0 0 8px;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Updated material</p>
+        <p style="margin:0 0 12px;font-size:18px;font-weight:600;color:#0f172a;">{{ material_title }}</p>
+        <p style="margin:0 0 6px;font-size:14px;"><strong>Course:</strong> {{ course_code }} · {{ course_title }}</p>
+        {% if department_name %}
+        <p style="margin:0 0 6px;font-size:14px;"><strong>Department:</strong> {{ department_name }}</p>
+        {% endif %}
+        {% if material_type %}
+        <p style="margin:0;font-size:14px;"><strong>Type:</strong> {{ material_type }}</p>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+  <p style="margin:0 0 24px;text-align:center;">
+    <a href="{{ material_link }}" style="display:inline-block;background:#0f766e;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:13px 28px;border-radius:8px;">View updated material</a>
+  </p>
+  <p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;word-break:break-all;">
+    If the button does not work, copy this link:<br/>{{ material_link }}
+  </p>
+{% endblock %}
