@@ -20,6 +20,7 @@ const SignUpForm = () => {
   const clearedSessionRef = useRef(false);
 
   const [selectedFaculty, setSelectedFaculty] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     student_id: "",
@@ -102,19 +103,20 @@ const SignUpForm = () => {
     !!trimmedStudentId &&
     !!trimmedFullName &&
     !!trimmedEmail &&
+    isValidEmail(trimmedEmail) &&
     !!selectedFaculty &&
     !!form.department_id &&
     !!form.semester_id &&
     !!form.accept_terms;
 
-  const isSubmitting = registerMut.isPending;
-  const isSubmitDisabled = !isFormValid || isSubmitting;
+  const isBusy = isSubmitting || registerMut.isPending;
+  const isSubmitDisabled = !isFormValid || isBusy;
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
 
-    if (isSubmitting) return;
+    if (isBusy) return;
 
     const showError = (msg) => {
       setFormError(msg);
@@ -145,6 +147,8 @@ const SignUpForm = () => {
       showError("Please select your current semester.");
       return;
     }
+
+    setIsSubmitting(true);
 
     try {
       if (user) {
@@ -183,6 +187,8 @@ const SignUpForm = () => {
       const msg = getApiErrorMessage(err, "Registration failed.");
       setFormError(msg);
       toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -190,26 +196,19 @@ const SignUpForm = () => {
     "block text-[12.5px] font-medium text-ds-text-secondary mb-1.5";
 
   const inputCls =
-    "w-full h-11 rounded-lg border border-ds-border " +
+    "w-full min-w-0 h-11 rounded-lg border border-ds-border " +
     "bg-ds-surface-input px-3.5 text-sm text-ds-text-primary " +
     "placeholder:text-ds-text-muted " +
     "focus:outline-none focus:border-ds-action/50 focus:ring-4 focus:ring-ds-action/10 transition";
 
   const selectCls =
-    "w-full h-11 rounded-lg border border-ds-border " +
-    "bg-ds-surface-input px-3.5 pr-10 text-sm text-ds-text-primary " +
+    "w-full min-w-0 h-11 rounded-lg border border-ds-border " +
+    "bg-ds-surface-input px-3.5 pr-12 text-sm text-ds-text-primary " +
     "placeholder:text-ds-text-muted " +
     "focus:outline-none focus:border-ds-action/50 focus:ring-4 focus:ring-ds-action/10 transition";
 
-  const btnBase =
-    "w-full h-11 rounded-lg text-sm font-semibold transition " +
-    "focus:outline-none focus:ring-4 focus:ring-ds-action/20";
-
-  const btnEnabled = "bg-ds-action hover:bg-ds-action-hover text-white";
-  const btnDisabled = "bg-ds-action/40 text-white/70 cursor-not-allowed";
-
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0">
       <div className="mb-5">
         <h2 className="text-xl font-semibold text-ds-text-primary">
           Create account
@@ -240,8 +239,8 @@ const SignUpForm = () => {
       ) : null}
 
       <form onSubmit={onSubmit} className="space-y-3.5">
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-5">
-          <div className="sm:col-span-2">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <div className="min-w-0">
             <label className={labelCls} htmlFor="student_id">
               Student ID <span className="text-ds-error">*</span>
             </label>
@@ -253,12 +252,12 @@ const SignUpForm = () => {
               type="text"
               placeholder="C123456"
               className={inputCls}
-              disabled={isSubmitting}
+              disabled={isBusy}
               autoComplete="username"
             />
           </div>
 
-          <div className="sm:col-span-3">
+          <div className="min-w-0">
             <label className={labelCls} htmlFor="full_name">
               Full name <span className="text-ds-error">*</span>
             </label>
@@ -270,13 +269,13 @@ const SignUpForm = () => {
               type="text"
               placeholder="Falastiin Ahmed"
               className={inputCls}
-              disabled={isSubmitting}
+              disabled={isBusy}
               autoComplete="name"
             />
           </div>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <label className={labelCls} htmlFor="student_email">
             Student email <span className="text-ds-error">*</span>
           </label>
@@ -288,58 +287,56 @@ const SignUpForm = () => {
             type="email"
             placeholder="student@university.edu"
             className={inputCls}
-            disabled={isSubmitting}
+            disabled={isBusy}
             autoComplete="email"
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-          <div>
-            <label className={labelCls}>
-              Faculty <span className="text-ds-error">*</span>
-            </label>
-            <AsyncDropdown
-              value={selectedFaculty}
-              onChange={handleFacultyPick}
-              options={facultyOptions}
-              isLoading={facultyDD.isLoading}
-              hasMore={facultyDD.hasMore}
-              onLoadMore={facultyDD.loadMore}
-              onSearch={facultyDD.setSearch}
-              placeholder="Select faculty"
-              inputClassName={selectCls}
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div>
-            <label className={labelCls}>
-              Department <span className="text-ds-error">*</span>
-            </label>
-            <AsyncDropdown
-              key={`department-${selectedFaculty || "none"}`}
-              value={form.department_id}
-              onChange={(val) =>
-                setForm((prev) => ({
-                  ...prev,
-                  department_id: String(val || ""),
-                }))
-              }
-              options={departmentOptions}
-              isLoading={deptDD.isLoading}
-              hasMore={deptDD.hasMore}
-              onLoadMore={deptDD.loadMore}
-              onSearch={deptDD.setSearch}
-              placeholder={
-                selectedFaculty ? "Select department" : "Select faculty first"
-              }
-              inputClassName={selectCls}
-              disabled={!selectedFaculty || isSubmitting}
-            />
-          </div>
+        <div className="min-w-0">
+          <label className={labelCls}>
+            Faculty <span className="text-ds-error">*</span>
+          </label>
+          <AsyncDropdown
+            value={selectedFaculty}
+            onChange={handleFacultyPick}
+            options={facultyOptions}
+            isLoading={facultyDD.isLoading}
+            hasMore={facultyDD.hasMore}
+            onLoadMore={facultyDD.loadMore}
+            onSearch={facultyDD.setSearch}
+            placeholder="Select faculty"
+            inputClassName={selectCls}
+            disabled={isBusy}
+          />
         </div>
 
-        <div>
+        <div className="min-w-0">
+          <label className={labelCls}>
+            Department <span className="text-ds-error">*</span>
+          </label>
+          <AsyncDropdown
+            key={`department-${selectedFaculty || "none"}`}
+            value={form.department_id}
+            onChange={(val) =>
+              setForm((prev) => ({
+                ...prev,
+                department_id: String(val || ""),
+              }))
+            }
+            options={departmentOptions}
+            isLoading={deptDD.isLoading}
+            hasMore={deptDD.hasMore}
+            onLoadMore={deptDD.loadMore}
+            onSearch={deptDD.setSearch}
+            placeholder={
+              selectedFaculty ? "Select department" : "Select faculty first"
+            }
+            inputClassName={selectCls}
+            disabled={!selectedFaculty || isBusy}
+          />
+        </div>
+
+        <div className="min-w-0">
           <label className={labelCls}>
             Current semester <span className="text-ds-error">*</span>
           </label>
@@ -359,7 +356,7 @@ const SignUpForm = () => {
             onSearch={semesterDD.setSearch}
             placeholder="Select semester"
             inputClassName={selectCls}
-            disabled={isSubmitting}
+            disabled={isBusy}
           />
         </div>
 
@@ -370,8 +367,8 @@ const SignUpForm = () => {
             name="accept_terms"
             checked={form.accept_terms}
             onChange={onChange}
-            className="mt-0.5 h-4 w-4 rounded border-ds-border text-ds-action focus:ring-ds-action/20"
-            disabled={isSubmitting}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-ds-border text-ds-action focus:ring-ds-action/20"
+            disabled={isBusy}
           />
           <label htmlFor="terms" className="text-sm text-ds-text-secondary">
             I agree to the{" "}
@@ -396,9 +393,16 @@ const SignUpForm = () => {
           type="submit"
           disabled={isSubmitDisabled}
           aria-disabled={isSubmitDisabled}
-          className={`${btnBase} ${isSubmitDisabled ? btnDisabled : btnEnabled}`}
+          aria-busy={isBusy}
+          className={
+            "mt-1 flex w-full min-h-11 shrink-0 items-center justify-center rounded-lg text-sm font-semibold " +
+            "visible opacity-100 focus:outline-none focus:ring-4 focus:ring-ds-action/20 " +
+            (isSubmitDisabled
+              ? "cursor-not-allowed border border-ds-border bg-ds-surface-hover text-ds-text-muted"
+              : "border border-transparent bg-ds-action text-white hover:bg-ds-action-hover")
+          }
         >
-          {isSubmitting ? "Submitting..." : "Create account"}
+          {isBusy ? "Creating account..." : "Create account"}
         </button>
       </form>
     </div>

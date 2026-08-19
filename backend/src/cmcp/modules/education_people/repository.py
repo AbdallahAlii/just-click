@@ -12,7 +12,7 @@ from cmcp.core.base_repo import BaseRepository
 import calendar as py_calendar
 from cmcp.modules.auth.models import User, UserAffiliation, UserStatusEnum, UserTypeEnum
 from cmcp.modules.education_people.models import StudentProfile, Classroom, StaffProfile
-from cmcp.modules.academic.models import Faculty, Department
+from cmcp.modules.academic.models import Faculty, Department, CourseOffering
 from cmcp.modules.materials.models import StudentMaterialInteraction, Material
 
 
@@ -550,3 +550,79 @@ class EducationPeopleRepo:
         ) or 0)
 
         return view_hits + download_hits
+
+    def dashboard_total_students(self, *, company_id: int) -> int:
+        stmt = (
+            select(func.count(StudentProfile.id))
+            .where(StudentProfile.company_id == int(company_id))
+        )
+        return int(self.s.scalar(stmt) or 0)
+
+    def dashboard_students_by_department(self, *, company_id: int) -> List[Dict[str, Any]]:
+        rows = self.s.execute(
+            select(
+                Department.id.label("department_id"),
+                Department.name.label("department_name"),
+                Department.code.label("department_code"),
+                func.count(StudentProfile.id).label("total"),
+            )
+            .select_from(Department)
+            .outerjoin(
+                StudentProfile,
+                and_(
+                    StudentProfile.department_id == Department.id,
+                    StudentProfile.company_id == int(company_id),
+                ),
+            )
+            .where(Department.company_id == int(company_id))
+            .group_by(Department.id, Department.name, Department.code)
+            .order_by(Department.name.asc())
+        ).all()
+
+        return [
+            {
+                "department_id": int(r.department_id),
+                "department_name": r.department_name,
+                "department_code": r.department_code,
+                "count": int(r.total or 0),
+            }
+            for r in rows
+        ]
+
+    def dashboard_materials_by_department(self, *, company_id: int) -> List[Dict[str, Any]]:
+        rows = self.s.execute(
+            select(
+                Department.id.label("department_id"),
+                Department.name.label("department_name"),
+                Department.code.label("department_code"),
+                func.count(Material.id).label("total"),
+            )
+            .select_from(Department)
+            .outerjoin(
+                CourseOffering,
+                and_(
+                    CourseOffering.department_id == Department.id,
+                    CourseOffering.company_id == int(company_id),
+                ),
+            )
+            .outerjoin(
+                Material,
+                and_(
+                    Material.course_offering_id == CourseOffering.id,
+                    Material.company_id == int(company_id),
+                ),
+            )
+            .where(Department.company_id == int(company_id))
+            .group_by(Department.id, Department.name, Department.code)
+            .order_by(Department.name.asc())
+        ).all()
+
+        return [
+            {
+                "department_id": int(r.department_id),
+                "department_name": r.department_name,
+                "department_code": r.department_code,
+                "count": int(r.total or 0),
+            }
+            for r in rows
+        ]

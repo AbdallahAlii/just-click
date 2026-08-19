@@ -956,6 +956,17 @@ class EducationPeopleService:
         analytics = self.repo.dashboard_global_material_analytics(company_id=company_id)
         analytics_value = int(analytics["total_views"] + analytics["total_downloads"])
 
+        total_students = self.repo.dashboard_total_students(company_id=company_id)
+        students_by_department = self.repo.dashboard_students_by_department(company_id=company_id)
+        materials_by_department = self.repo.dashboard_materials_by_department(company_id=company_id)
+
+        current_new_students = int(current_new_users.get("students") or 0)
+        previous_new_students = int(previous_new_users.get("students") or 0)
+        students_trend = self._trend_payload(
+            current=current_new_students,
+            previous=previous_new_students,
+        )
+
         # NOTE:
         # This trend is a best-effort proxy from recent interaction timestamps.
         # For true monthly views/downloads trend, use an event log or daily snapshot table.
@@ -1083,9 +1094,19 @@ class EducationPeopleService:
                         "total_downloads": int(analytics["total_downloads"]),
                     },
                 },
+                "total_students": {
+                    "value": int(total_students),
+                    "change_percent": students_trend["change_percent"],
+                    "trend": students_trend["trend"],
+                    "meta": {
+                        "departments": int(len(students_by_department)),
+                    },
+                },
             },
             "charts": {
                 "user_growth": chart_points,
+                "materials_by_department": materials_by_department,
+                "students_by_department": students_by_department,
             },
         }
 

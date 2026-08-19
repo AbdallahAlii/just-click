@@ -202,6 +202,55 @@ const MaterialBreakdown = ({ data }) => {
   );
 };
 
+const DepartmentBreakdown = ({ title, description, rows }) => {
+  const items = Array.isArray(rows) ? rows : [];
+  const total = items.reduce((acc, row) => acc + Number(row?.count || 0), 0);
+  const maxCount = Math.max(0, ...items.map((row) => Number(row?.count || 0)));
+
+  return (
+    <div className="bg-ds-surface border border-ds-border rounded-3xl p-6 shadow-sm h-full flex flex-col">
+      <div className="mb-6">
+        <h2 className="text-lg font-bold text-ds-text-primary">{title}</h2>
+        <p className="text-sm text-ds-text-secondary mt-1">{description}</p>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="text-sm text-ds-text-muted">No departments found.</p>
+      ) : (
+        <div className="flex-1 flex flex-col justify-start space-y-4">
+          {items.map((row) => {
+            const count = Number(row.count || 0);
+            const percent = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+            const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
+            const name = row.department_name || "Unnamed department";
+            const code = row.department_code ? ` (${row.department_code})` : "";
+
+            return (
+              <div key={row.department_id} className="min-w-0">
+                <div className="flex justify-between items-baseline gap-3 mb-1.5">
+                  <span className="text-sm font-semibold text-ds-text-primary min-w-0 break-words">
+                    {name}
+                    {code}
+                  </span>
+                  <span className="text-sm font-medium text-ds-text-secondary shrink-0">
+                    {count.toLocaleString()} ({percent}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-ds-surface-hover rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-ds-action rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${barWidth}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminDashboardMain = () => {
   const { data: apiResponse, isLoading, isError } = useAdminDashboardSummary();
   const { data: feedbackSummaryRes } = useMaterialFeedbackAdminSummary();
@@ -246,13 +295,6 @@ const AdminDashboardMain = () => {
           <h1 className="text-3xl font-bold text-ds-text-primary mb-2 font-display tracking-tight">
             Dashboard Overview
           </h1>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button className="px-4 py-2 bg-ds-surface border border-ds-border text-ds-text-secondary rounded-xl text-sm font-medium hover:bg-ds-surface-hover transition-colors shadow-sm flex items-center gap-2">
-            <Download className="w-4 h-4" />
-            Export Report
-          </button>
         </div>
       </div>
 
@@ -308,6 +350,28 @@ const AdminDashboardMain = () => {
         <div className="lg:col-span-1">
           <MaterialBreakdown data={summary_cards.total_materials.meta} />
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <Card
+          title="Total Students"
+          value={summary_cards.total_students?.value ?? 0}
+          change={summary_cards.total_students?.change_percent ?? 0}
+          trend={summary_cards.total_students?.trend || "up"}
+          icon={GraduationCap}
+          meta={summary_cards.total_students?.meta || {}}
+          metaIcons={{ departments: BookOpen }}
+        />
+        <DepartmentBreakdown
+          title="Materials by Department"
+          description="Live material counts grouped by department"
+          rows={charts.materials_by_department}
+        />
+        <DepartmentBreakdown
+          title="Students by Department"
+          description="Live student counts grouped by department"
+          rows={charts.students_by_department}
+        />
       </div>
 
       {/* Material feedback moderation */}

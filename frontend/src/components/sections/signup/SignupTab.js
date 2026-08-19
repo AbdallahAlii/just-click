@@ -6,7 +6,7 @@ import SignUpForm from "@/components/shared/login/SignUpForm";
 const SignupTab = () => {
   return (
     <section className="bg-ds-page">
-      <div className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-lg flex-col justify-center px-6 py-12 sm:px-8 md:min-h-[calc(100vh-10rem)] md:py-16">
+      <div className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl flex-col justify-center px-6 py-12 sm:px-8 md:min-h-[calc(100vh-10rem)] md:py-16">
         <div className="mb-8 text-center">
           <Link
             href="/"
@@ -22,7 +22,7 @@ const SignupTab = () => {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-ds-border bg-ds-surface p-6 sm:p-8 shadow-sm">
+        <div className="rounded-2xl border border-ds-border bg-ds-surface p-6 sm:p-8 shadow-sm overflow-visible">
           <SignUpForm />
         </div>
 

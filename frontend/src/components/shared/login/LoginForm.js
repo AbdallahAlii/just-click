@@ -19,6 +19,7 @@ const LoginForm = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (user) router.replace("/materials");
@@ -30,9 +31,15 @@ const LoginForm = () => {
     setForm((p) => ({ ...p, [name]: value }));
   };
 
+  const isFormValid = !!form.username.trim() && !!form.password.trim();
+  const isBusy = isSubmitting || loginMut.isPending;
+  const isSubmitDisabled = !isFormValid || isBusy;
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
+
+    if (isBusy) return;
 
     if (!form.username.trim() || !form.password.trim()) {
       const msg = "Please enter username and password.";
@@ -40,6 +47,8 @@ const LoginForm = () => {
       toast.error(msg);
       return;
     }
+
+    setIsSubmitting(true);
 
     try {
       await loginMut.mutateAsync({
@@ -53,6 +62,8 @@ const LoginForm = () => {
       const msg = getApiErrorMessage(e2, "Invalid username or password.");
       setFormError(msg);
       toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -60,22 +71,13 @@ const LoginForm = () => {
     "block text-[12.5px] font-medium text-ds-text-secondary mb-1.5";
 
   const inputCls =
-    "w-full h-11 rounded-lg border border-ds-border " +
+    "w-full min-w-0 h-11 rounded-lg border border-ds-border " +
     "bg-ds-surface-input px-3.5 text-sm text-ds-text-primary " +
     "placeholder:text-ds-text-muted " +
     "focus:outline-none focus:border-ds-action/50 focus:ring-4 focus:ring-ds-action/10 transition";
 
-  const btnBase =
-    "w-full h-11 rounded-lg text-sm font-semibold transition " +
-    "focus:outline-none focus:ring-4 focus:ring-ds-action/20";
-
-  const btnEnabled = "bg-ds-action hover:bg-ds-action-hover text-white";
-  const btnDisabled = "bg-ds-action/40 text-white/70 cursor-not-allowed";
-
-  const isLoading = loginMut.isPending;
-
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0">
       <div className="mb-5">
         <h2 className="text-xl font-semibold text-ds-text-primary">Sign in</h2>
         <p className="mt-1 text-sm text-ds-text-muted">
@@ -112,7 +114,7 @@ const LoginForm = () => {
             placeholder="Enter username"
             className={inputCls}
             autoComplete="username"
-            disabled={isLoading}
+            disabled={isBusy}
           />
         </div>
 
@@ -125,8 +127,8 @@ const LoginForm = () => {
             <button
               type="button"
               onClick={() => setShowPassword((v) => !v)}
-              className="text-xs font-semibold text-ds-action hover:underline disabled:opacity-60"
-              disabled={isLoading}
+              className="text-xs font-semibold text-ds-action hover:underline disabled:cursor-not-allowed"
+              disabled={isBusy}
             >
               {showPassword ? "Hide" : "Show"}
             </button>
@@ -141,7 +143,7 @@ const LoginForm = () => {
             placeholder="Enter password"
             className={inputCls}
             autoComplete="current-password"
-            disabled={isLoading}
+            disabled={isBusy}
           />
         </div>
 
@@ -155,11 +157,19 @@ const LoginForm = () => {
         </div>
 
         <button
-          disabled={isLoading}
           type="submit"
-          className={`${btnBase} ${isLoading ? btnDisabled : btnEnabled}`}
+          disabled={isSubmitDisabled}
+          aria-disabled={isSubmitDisabled}
+          aria-busy={isBusy}
+          className={
+            "mt-1 flex w-full min-h-11 shrink-0 items-center justify-center rounded-lg text-sm font-semibold " +
+            "visible opacity-100 focus:outline-none focus:ring-4 focus:ring-ds-action/20 " +
+            (isSubmitDisabled
+              ? "cursor-not-allowed border border-ds-border bg-ds-surface-hover text-ds-text-muted"
+              : "border border-transparent bg-ds-action text-white hover:bg-ds-action-hover")
+          }
         >
-          {isLoading ? "Signing in..." : "Sign in"}
+          {isBusy ? "Signing in..." : "Sign in"}
         </button>
       </form>
     </div>
