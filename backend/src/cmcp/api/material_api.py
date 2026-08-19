@@ -704,7 +704,7 @@ def get_material_filter_options(company_id: int):
 def track_material_view(company_id: int, material_id: int):
     """Track when a student views a material (with cooldown)."""
     try:
-        cooldown_seconds = request.args.get("cooldown_seconds", type=int) or 3600
+        cooldown_seconds = request.args.get("cooldown_seconds", type=int) or 60
 
         ok, msg, out = svc.track_view(
             company_id=company_id,

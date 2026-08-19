@@ -216,7 +216,6 @@ const MaterialsMain = () => {
               { label: "Presentation (Slides)", value: "slides" },
               { label: "Document", value: "doc" },
               { label: "Video", value: "video" },
-              { label: "External Link", value: "link" },
               { label: "Other", value: "other" },
             ],
             isLoading: false,

@@ -46,7 +46,6 @@ const MATERIAL_TYPE_OPTIONS = [
   { value: "slides", label: "Slides / PPT" },
   { value: "doc", label: "Document" },
   { value: "video", label: "Video" },
-  { value: "link", label: "Link" },
   { value: "other", label: "Other" },
 ];
 

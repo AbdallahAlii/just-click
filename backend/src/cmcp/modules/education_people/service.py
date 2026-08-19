@@ -1040,10 +1040,8 @@ class EducationPeopleService:
                     "change_percent": total_users_trend["change_percent"],
                     "trend": total_users_trend["trend"],
                     "meta": {
-                        "students": int(user_type_counts["students"]),
-                        "lecturers": int(user_type_counts["lecturers"]),
-                        "staff": int(user_type_counts["staff"]),
-                        "admins": int(user_type_counts["admins"]),
+                        "student_count": int(user_type_counts["students"]),
+                        "admin_count": int(user_type_counts["admins"]),
                     },
                 },
                 "pending_user_approvals": {
@@ -1051,10 +1049,8 @@ class EducationPeopleService:
                     "change_percent": pending_trend["change_percent"],
                     "trend": pending_trend["trend"],
                     "meta": {
-                        "students": int(pending["students"]),
-                        "lecturers": int(pending["lecturers"]),
-                        "staff": int(pending["staff"]),
-                        "admins": int(pending["admins"]),
+                        "student_count": int(pending["students"]),
+                        "admin_count": int(pending["admins"]),
                         "approval_stages": {
                             "pending_email_verification": int(
                                 pending["approval_stages"]["pending_email_verification"]

@@ -127,16 +127,7 @@ const MaterialDetailsPrimary = ({ id }) => {
     if (!numericId || !rawMaterial) return;
     if (hasTrackedViewRef.current) return;
 
-    const sessionKey = `material_view_tracked_${numericId}`;
-    if (typeof window !== "undefined" && sessionStorage.getItem(sessionKey)) {
-      hasTrackedViewRef.current = true;
-      return;
-    }
-
     hasTrackedViewRef.current = true;
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(sessionKey, "1");
-    }
     trackView({ id: numericId, cooldown_seconds: 3600 });
   }, [numericId, rawMaterial, trackView]);
 

@@ -51,9 +51,12 @@ const MaterialListItem = ({ material, onToggleFavorite, onShareMaterial }) => {
     ? `Semester ${semesterNumber}`
     : semesterName || "";
 
+  const materialType = (material?.materialType || fileExtension || "").toLowerCase();
+  const isPreviewableType = ["video", "pdf"].includes(materialType);
+  const canOpenPreview = isPreviewableType && readUrl;
+
   const detailHref = id ? `/materials/${id}` : "#";
-  const previewHref =
-    canPreviewInBrowser && readUrl ? readUrl : detailHref;
+  const previewHref = canOpenPreview ? readUrl : detailHref;
 
   const handleDetailClick = () => {
     if (!id) return;
@@ -209,8 +212,8 @@ const MaterialListItem = ({ material, onToggleFavorite, onShareMaterial }) => {
 
           <a
             href={previewHref}
-            target={canPreviewInBrowser ? "_blank" : undefined}
-            rel={canPreviewInBrowser ? "noopener noreferrer" : undefined}
+            target={canOpenPreview ? "_blank" : undefined}
+            rel={canOpenPreview ? "noopener noreferrer" : undefined}
             onClick={handleDetailClick}
             className={iconBtnClass}
             aria-label="Preview material"

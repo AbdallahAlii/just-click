@@ -149,7 +149,7 @@ export const materialsApi = {
   /**
    * Track material view
    */
-  trackView: (id, cooldown_seconds = 3600) =>
+  trackView: (id, cooldown_seconds = 60) =>
     fetchJSON(`/materials/${id}/view?cooldown_seconds=${cooldown_seconds}`, {
       method: "POST",
     }),

@@ -2584,7 +2584,6 @@ class MaterialsRepo:
     # -------------------------------------------------------------------------
 
     def _admin_materials_scope_stmt(self, *, company_id: int):
-        scope = self._current_user_scope(company_id=company_id)
         stmt = (
             select(
                 Material.id.label("material_id"),
@@ -2604,7 +2603,6 @@ class MaterialsRepo:
         )
         stmt = self._add_standard_joins(stmt, company_id=company_id)
         stmt = stmt.where(Material.company_id == int(company_id), Material.is_enabled.is_(True))
-        stmt = self._apply_scope(stmt, scope)
         return stmt
 
     def get_access_reports(self, *, company_id: int, limit: int = 10) -> Dict[str, Any]:

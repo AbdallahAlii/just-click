@@ -202,11 +202,11 @@ const SignUpForm = () => {
     "focus:outline-none focus:border-ds-action/50 focus:ring-4 focus:ring-ds-action/10 transition";
 
   const btnBase =
-    "w-full h-11 rounded-lg text-white text-sm font-semibold transition " +
+    "w-full h-11 rounded-lg text-sm font-semibold transition " +
     "focus:outline-none focus:ring-4 focus:ring-ds-action/20";
 
-  const btnEnabled = "bg-ds-action hover:bg-ds-action-hover";
-  const btnDisabled = "bg-ds-action/60 cursor-not-allowed";
+  const btnEnabled = "bg-ds-action hover:bg-ds-action-hover text-white";
+  const btnDisabled = "bg-ds-action/40 text-white/70 cursor-not-allowed";
 
   return (
     <div className="w-full">

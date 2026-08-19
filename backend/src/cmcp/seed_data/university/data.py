@@ -96,7 +96,7 @@ UNIVERSITIES: List[Dict[str, Any]] = [
         "super_admin_user": {
             "username": "jc_admin",
             "email": "admin@jamhuriya.edu",
-            "password": "ChangeMe!123",
+            "password": "just1234",
             "user_type": "ADMIN",
             "profile": {
                 "full_name": "Jamhuriya University Admin",
@@ -107,37 +107,21 @@ UNIVERSITIES: List[Dict[str, Any]] = [
             },
         },
         "student_user": {
-            "username": "jc_student1",
-            "email": "c12291@student.jamhuriya.edu",
-            "password": "ChangeMe!123",
+            "username": "C12222",
+            "email": "c12222@student.jamhuriya.edu",
+            "password": "just1234",
             "user_type": "STUDENT",
             "profile": {
                 "full_name": "Zahra Student",
-                "student_id": "C12291",
+                "student_id": "C12222",
                 "faculty_code": "FCS",
-                "department_code": "IS",
+                "department_code": "CA",
                 "semester_number": 1,
                 "classroom_id": None,
                 "is_enabled": True,
             },
         },
-        "student_users": [
-            {
-                "username": "jc_student2",
-                "email": "c12292@student.jamhuriya.edu",
-                "password": "ChangeMe!123",
-                "user_type": "STUDENT",
-                "profile": {
-                    "full_name": "Ahmed Computer App",
-                    "student_id": "C12292",
-                    "faculty_code": "FCS",
-                    "department_code": "CA",
-                    "semester_number": 2,
-                    "classroom_name": "CA227",
-                    "is_enabled": True,
-                },
-            }
-        ],
+        "student_users": [],
         "academic": {
             "faculty": {"name": "Faculty of Information Technology", "code": "FCS"},
             "departments": [

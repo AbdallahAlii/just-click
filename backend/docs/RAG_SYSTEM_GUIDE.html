@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JustClick AI — RAG System Guide</title>
+<style>
+  @page { margin: 2cm; size: A4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #1a1a2e; line-height: 1.6; max-width: 820px; margin: 0 auto; padding: 40px 24px; }
+  h1 { font-size: 28px; color: #0f3460; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #666; margin-bottom: 32px; }
+  h2 { font-size: 20px; color: #0f3460; margin-top: 32px; margin-bottom: 12px; border-bottom: 2px solid #e0e7ff; padding-bottom: 6px; }
+  h3 { font-size: 16px; color: #1a1a2e; margin-top: 20px; margin-bottom: 8px; }
+  p, li { font-size: 14px; margin-bottom: 8px; }
+  ul, ol { padding-left: 24px; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+  th, td { border: 1px solid #d1d5db; padding: 8px 12px; text-align: left; }
+  th { background: #f0f4ff; font-weight: 600; color: #0f3460; }
+  tr:nth-child(even) { background: #fafbff; }
+  code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+  .highlight-box { background: #eef2ff; border-left: 4px solid #4f46e5; padding: 14px 18px; border-radius: 6px; margin: 16px 0; }
+  .highlight-box p { margin: 0; }
+  .cmd { background: #1e293b; color: #e2e8f0; padding: 12px 16px; border-radius: 8px; font-family: monospace; font-size: 13px; margin: 10px 0 16px; overflow-x: auto; white-space: pre; }
+  .flow-step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+  .step-num { background: #4f46e5; color: white; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .step-text { flex: 1; font-size: 14px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
+  .col-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
+  .col-card h4 { font-size: 14px; color: #4f46e5; margin-bottom: 8px; }
+  @media print { body { padding: 0; } h2 { page-break-after: avoid; } table { page-break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<h1>JustClick AI — RAG System Guide</h1>
+<p class="subtitle">Prepared for team panel · August 2026</p>
+
+<h2>1. What is RAG?</h2>
+<p><strong>RAG = Retrieval-Augmented Generation.</strong> Instead of asking an AI model to answer from its general knowledge (which can hallucinate or make up answers), we:</p>
+<ol>
+  <li><strong>Retrieve</strong> the most relevant paragraphs from the actual course material file</li>
+  <li><strong>Generate</strong> an answer using <em>only those paragraphs</em></li>
+</ol>
+<div class="highlight-box">
+  <p>This keeps every answer grounded in the real material content — the AI cannot make things up.</p>
+</div>
+
+<h2>2. The Two Models We Use</h2>
+<table>
+  <tr><th>Role</th><th>Model</th><th>Runs Where</th><th>Why</th></tr>
+  <tr><td><strong>Embedding</strong> (search)</td><td><code>BAAI/bge-small-en-v1.5</code></td><td>Locally on our server (CPU)</td><td>Converts text into numbers (vectors) for meaning-based search</td></tr>
+  <tr><td><strong>LLM</strong> (answers)</td><td><code>deepseek-chat</code></td><td>DeepSeek cloud API</td><td>Reads retrieved text and writes human-quality answers</td></tr>
+</table>
+<p><strong>Why two models?</strong> The embedding model runs locally so we never send full documents to an external API. Only small text snippets go to DeepSeek when a student asks a question.</p>
+
+<h3>What is BAAI/bge-small-en-v1.5?</h3>
+<p>BAAI (Beijing Academy of AI) created this open-source embedding model. "bge-small" means it's lightweight (~130 MB) and runs fast on CPU without needing a GPU. It converts any text into a list of 384 numbers (a "vector") that captures the text's meaning.</p>
+
+<h3>What is DeepSeek?</h3>
+<p>DeepSeek is an AI company providing LLM API access (like OpenAI). We use their <code>deepseek-chat</code> model via an OpenAI-compatible API. It receives only the retrieved text snippets plus the student's question, and generates an answer. Requires an API key (<code>DEEPSEEK_API_KEY</code>).</p>
+
+<h2>3. What is an Embedding?</h2>
+<p>An embedding is a list of numbers (384 numbers in our case) representing the <em>meaning</em> of text:</p>
+<table>
+  <tr><th>Text</th><th>Vector (simplified)</th></tr>
+  <tr><td>"Python is a programming language"</td><td>[0.12, -0.34, 0.56, …]</td></tr>
+  <tr><td>"A coding language called Python"</td><td>[0.11, -0.35, 0.55, …] — very similar!</td></tr>
+  <tr><td>"The weather is sunny today"</td><td>[0.89, 0.22, -0.41, …] — very different</td></tr>
+</table>
+<p>Similar meanings → similar vectors. This is how we search by meaning instead of just keywords.</p>
+
+<h2>4. What is a Vector Database (ChromaDB)?</h2>
+<p>A <strong>vector database</strong> is specialized storage for searching by meaning. Regular PostgreSQL searches by exact text or keywords, but it cannot answer: <em>"find the paragraph most similar to this question."</em></p>
+
+<div class="highlight-box">
+  <p><strong>ChromaDB is NOT inside PostgreSQL.</strong> It stores data as files on disk at <code>backend/instance/chroma_db/</code>. It's a lightweight embedded database — no extra server process needed.</p>
+</div>
+
+<p><strong>Why can't we just use PostgreSQL?</strong> PostgreSQL stores material metadata (title, type, file path, view counts). But to find "which paragraph of this 50-page PDF best answers the student's question," we need vector similarity search — that's what ChromaDB does.</p>
+
+<h2>5. How the System Works</h2>
+
+<h3>Indexing (background, once per material)</h3>
+<div class="flow-step"><div class="step-num">1</div><div class="step-text">Read the material file (decrypt if encrypted with Fernet)</div></div>
+<div class="flow-step"><div class="step-num">2</div><div class="step-text">Extract text from PDF / PPTX / PPT / DOCX</div></div>
+<div class="flow-step"><div class="step-num">3</div><div class="step-text">Split text into small chunks (~400 words each, with 80-word overlap)</div></div>
+<div class="flow-step"><div class="step-num">4</div><div class="step-text">Convert each chunk into a vector using the local BAAI model</div></div>
+<div class="flow-step"><div class="step-num">5</div><div class="step-text">Store chunks + vectors in ChromaDB</div></div>
+<div class="flow-step"><div class="step-num">6</div><div class="step-text">Record indexing status in PostgreSQL (<code>chatbot_material_indexes</code> table)</div></div>
+
+<h3>Answering (when student asks a question)</h3>
+<div class="flow-step"><div class="step-num">1</div><div class="step-text">Student asks: "What is polymorphism?"</div></div>
+<div class="flow-step"><div class="step-num">2</div><div class="step-text">Convert the question to a vector (same BAAI model)</div></div>
+<div class="flow-step"><div class="step-num">3</div><div class="step-text">Search ChromaDB for the 5 most similar chunks from <em>that specific material</em></div></div>
+<div class="flow-step"><div class="step-num">4</div><div class="step-text">Send those chunks + the question to DeepSeek: "Answer using only this context"</div></div>
+<div class="flow-step"><div class="step-num">5</div><div class="step-text">Return the answer to the student</div></div>
+
+<h2>6. Database Tables Used by RAG</h2>
+<table>
+  <tr><th>Table</th><th>Purpose</th></tr>
+  <tr><td><code>chatbot_material_indexes</code></td><td>Tracks indexing status per material (indexed / pending / failed, chunk count, file hash)</td></tr>
+  <tr><td><code>chatbot_index_jobs</code></td><td>Background job queue — worker picks pending jobs and processes them</td></tr>
+  <tr><td><code>chatbot_sessions</code></td><td>Chat conversations (one per student per material)</td></tr>
+  <tr><td><code>chatbot_messages</code></td><td>Individual messages (user questions + AI answers)</td></tr>
+</table>
+
+<h2>7. Code Files and What Each Does</h2>
+
+<h3><code>backend/src/cmcp/modules/chatbot/</code></h3>
+<table>
+  <tr><th>File</th><th>Purpose</th></tr>
+  <tr><td><code>models.py</code></td><td>SQLAlchemy models for the 4 tables above</td></tr>
+  <tr><td><code>service.py</code></td><td>Business logic — handle ask requests, check index status</td></tr>
+  <tr><td><code>jobs.py</code></td><td>Schedule indexing jobs, prevent duplicates</td></tr>
+  <tr><td><code>rag/extractor.py</code></td><td>Read PDF/PPTX/PPT/DOCX files and extract text</td></tr>
+  <tr><td><code>rag/chunker.py</code></td><td>Split long text into overlapping chunks</td></tr>
+  <tr><td><code>rag/embeddings.py</code></td><td>Load the BAAI model, convert text to vectors</td></tr>
+  <tr><td><code>rag/vector_store.py</code></td><td>Read/write to ChromaDB</td></tr>
+  <tr><td><code>rag/retriever.py</code></td><td>Find relevant chunks for a question (semantic search)</td></tr>
+  <tr><td><code>rag/indexer.py</code></td><td>Full indexing pipeline (extract → chunk → embed → store)</td></tr>
+  <tr><td><code>rag/answer.py</code></td><td>Call DeepSeek API, build prompts, format response</td></tr>
+  <tr><td><code>rag/modes.py</code></td><td>Detect if question is chat / summary / quiz / Q&amp;A</td></tr>
+  <tr><td><code>rag/prompts.py</code></td><td>System and user prompts for each mode</td></tr>
+  <tr><td><code>rag/warmup.py</code></td><td>Preload models when the app starts</td></tr>
+</table>
+
+<h3><code>backend/scripts/</code></h3>
+<table>
+  <tr><th>Script</th><th>Purpose</th></tr>
+  <tr><td><code>chatbot_index_worker.py</code></td><td>Background worker that processes indexing jobs from the queue</td></tr>
+  <tr><td><code>download_embedding_model.py</code></td><td>One-time download of the BAAI embedding model (~130 MB)</td></tr>
+  <tr><td><code>reindex_existing_materials.py</code></td><td>Queue all materials for re-indexing</td></tr>
+  <tr><td><code>reset_failed_index_jobs.py</code></td><td>Reset failed jobs so worker retries them</td></tr>
+  <tr><td><code>diagnose_chatbot_index.py</code></td><td>Print diagnostic info (job counts, failures)</td></tr>
+</table>
+
+<h2>8. What is <code>backend/instance/</code>?</h2>
+<p>This folder is <strong>auto-created at runtime</strong> — you do NOT create it manually. It contains:</p>
+<table>
+  <tr><th>Folder</th><th>Contents</th><th>Created By</th></tr>
+  <tr><td><code>instance/chroma_db/</code></td><td>ChromaDB vector data files</td><td>Auto-created when first material is indexed</td></tr>
+  <tr><td><code>instance/embedding_models/</code></td><td>Downloaded BAAI model (~130 MB)</td><td><code>python scripts/download_embedding_model.py</code></td></tr>
+</table>
+<p>Both folders are <strong>gitignored</strong> — they exist only on the server and are never committed to GitHub.</p>
+
+<h2>9. What is Seed Data and Why We Use It</h2>
+<p><strong>Seeding</strong> means populating the database with demo/test data so the application has something to show. Our seed creates:</p>
+<ul>
+  <li>1 university (Jamhuriya University)</li>
+  <li>Faculties, departments, semesters</li>
+  <li>Courses with chapters</li>
+  <li>~100–180 demo materials (PDF, slides, docs, videos)</li>
+  <li>1 admin user (<code>jc_admin</code>) and 1 demo student (<code>C12222</code>)</li>
+  <li>RBAC roles and permissions</li>
+</ul>
+<p>The seed is <strong>idempotent</strong> — running it again will not create duplicates.</p>
+
+<h3>Seed Commands</h3>
+<div class="cmd">cd backend && source .venv/bin/activate
+
+# Seed everything (recommended for fresh setup)
+flask --app cmcp seed all
+
+# Destructive reset — removes all demo data, then re-seed
+flask --app cmcp demo-reset --yes
+flask --app cmcp seed all
+
+# Index materials for AI chatbot after seeding
+python scripts/reindex_existing_materials.py
+python scripts/chatbot_index_worker.py --until-empty</div>
+
+<h2>10. Backend Folder Structure</h2>
+<div class="cmd">backend/
+├── src/cmcp/                    ← Main Flask application package
+│   ├── __init__.py              ← App factory, registers blueprints &amp; CLI
+│   ├── api/                     ← REST API route handlers (blueprints)
+│   ├── cli/                     ← Flask CLI commands (seed, demo-reset)
+│   ├── common/                  ← Shared utilities (email, security)
+│   ├── config/                  ← App settings, database config, media config
+│   ├── core/                    ← Base classes, exceptions
+│   ├── models/                  ← Shared model imports
+│   ├── modules/                 ← Feature modules
+│   │   ├── chatbot/             ← AI chatbot (RAG system)
+│   │   ├── materials/           ← Material CRUD, search, reports
+│   │   ├── academic/            ← Courses, chapters, offerings, semesters
+│   │   ├── auth/                ← Authentication, users
+│   │   ├── rbac/                ← Roles &amp; permissions
+│   │   ├── media/               ← File upload, encryption, storage
+│   │   ├── education_people/    ← Student/staff profiles, onboarding
+│   │   ├── notifications/       ← Email &amp; in-app notifications
+│   │   └── University/          ← Company/university model
+│   ├── seed_data/               ← Demo data seeders
+│   │   ├── core/                ← System owner user
+│   │   ├── rbac/                ← Roles, permissions
+│   │   ├── university/          ← University, courses, materials
+│   │   └── people/              ← Classrooms, staff, students
+│   └── security/                ← Auth decorators, RBAC checks
+├── scripts/                     ← Standalone scripts (workers, diagnostics)
+├── instance/                    ← Runtime data (gitignored)
+├── mock_files/                  ← Small fixture files for seeding
+├── requirements.txt             ← Python dependencies
+└── docs/                        ← Documentation</div>
+
+<h2>11. Python Packages for RAG</h2>
+<table>
+  <tr><th>Package</th><th>Version</th><th>Purpose</th></tr>
+  <tr><td><code>sentence-transformers</code></td><td>3.3.1</td><td>Load and run the BAAI embedding model locally</td></tr>
+  <tr><td><code>chromadb</code></td><td>0.5.23</td><td>Vector database for storing/searching chunks</td></tr>
+  <tr><td><code>openai</code></td><td>1.58.1</td><td>Client for calling DeepSeek API (OpenAI-compatible)</td></tr>
+  <tr><td><code>pypdf</code></td><td>5.1.0</td><td>Extract text from PDF files</td></tr>
+  <tr><td><code>python-pptx</code></td><td>1.0.2</td><td>Extract text from PPTX slides</td></tr>
+  <tr><td><code>python-docx</code></td><td>1.1.2</td><td>Extract text from DOCX documents</td></tr>
+  <tr><td><code>olefile</code></td><td>0.47</td><td>Extract text from legacy PPT (97-2003) files</td></tr>
+</table>
+<p><code>torch</code> (PyTorch) is also installed as a dependency of <code>sentence-transformers</code> — it's the ML framework that runs the embedding model. <strong>GPU is NOT required.</strong></p>
+
+<h3>How to install</h3>
+<div class="cmd">cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Download embedding model (one-time)
+python scripts/download_embedding_model.py</div>
+
+<h2>12. Why Slides/DOC Can't Preview in Browser</h2>
+<p><strong>PDF and Video</strong> can be previewed directly in the browser because all modern browsers have built-in PDF viewers and video players.</p>
+<p><strong>PPTX/PPT and DOCX</strong> cannot be reliably previewed in the browser because:</p>
+<ul>
+  <li>Browsers have no built-in PowerPoint or Word viewer</li>
+  <li>Converting them to viewable formats (like Google Docs Viewer) requires sending files to a third-party service, which conflicts with our file encryption and privacy requirements</li>
+  <li>JavaScript-based PPTX/DOCX renderers exist but are unreliable with complex formatting, fonts, and layouts</li>
+</ul>
+<p>For these types, users are directed to the material detail page where they can download the file and open it in their desktop application.</p>
+
+<h2>13. Quick Reference</h2>
+<table>
+  <tr><th>Piece</th><th>Technology</th></tr>
+  <tr><td>LLM answers</td><td>DeepSeek <code>deepseek-chat</code> (cloud API)</td></tr>
+  <tr><td>Embeddings</td><td><code>BAAI/bge-small-en-v1.5</code> (local CPU)</td></tr>
+  <tr><td>Vector DB</td><td>ChromaDB (<code>instance/chroma_db</code>)</td></tr>
+  <tr><td>App DB</td><td>PostgreSQL (sessions, jobs, index status)</td></tr>
+  <tr><td>Worker</td><td><code>scripts/chatbot_index_worker.py</code></td></tr>
+  <tr><td>Pattern</td><td>RAG — retrieve then generate</td></tr>
+  <tr><td>Backend framework</td><td>Flask (Python)</td></tr>
+  <tr><td>Frontend framework</td><td>Next.js (React)</td></tr>
+</table>
+
+<p style="margin-top: 40px; font-size: 12px; color: #999; text-align: center;">JustClick AI · RAG System Guide · Generated August 2026</p>
+
+</body>
+</html>
