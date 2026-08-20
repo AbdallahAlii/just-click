@@ -502,6 +502,8 @@ def list_materials(company_id: int):
     - chapter_id: Filter by specific chapter
     - semester_id: Filter by semester
     - academic_year_id: Filter by academic year
+    - department_id: Admin-only optional department filter. Ignored for students/staff.
+    - faculty_id: Admin-only optional faculty filter. Ignored for students/staff.
     - material_type: slides, pdf, doc, video, link, other
     - is_favorite: true/false - show only favorites
     - search: Search in title/description/course/chapter
@@ -583,6 +585,8 @@ def list_materials_admin(company_id: int):
         filters: Dict[str, Any] = {
             "course_offering_id": q.get("course_offering_id", type=int),
             "chapter_id": q.get("chapter_id", type=int),
+            "department_id": q.get("department_id", type=int),
+            "faculty_id": q.get("faculty_id", type=int),
             "material_type": (q.get("material_type") or "").strip() or None,
             "search": (q.get("search") or "").strip() or None,
         }

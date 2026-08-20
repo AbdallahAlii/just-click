@@ -242,6 +242,25 @@ class MaterialsRepo:
         except Exception:
             return None
 
+    def _is_company_admin(self) -> bool:
+        ctx = getattr(g, "auth", None)
+        if not ctx:
+            return False
+        if bool(getattr(ctx, "is_system_owner", False)) or bool(getattr(ctx, "is_system_admin", False)):
+            return True
+        return str(getattr(ctx, "user_type", "") or "").strip().lower() == "admin"
+
+    def _sanitize_list_filters(self, filters: Dict[str, Any], scope: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Students/staff cannot browse other departments via query params.
+        Admins may pass department_id / faculty_id as an optional filter.
+        """
+        cleaned = dict(filters or {})
+        if scope.get("profile_type") != "admin":
+            cleaned.pop("department_id", None)
+            cleaned.pop("faculty_id", None)
+        return cleaned
+
     def course_exists(self, *, company_id: int, course_id: int) -> bool:
         """Check if a course definition exists"""
         stmt = select(exists().where(
@@ -442,10 +461,11 @@ class MaterialsRepo:
         Resolve user's academic scope.
 
         Priority:
-        1. Student → department_id + faculty_id + semester_id + semester_number
-        2. Staff with department_id → restrict to that department
-        3. Staff with faculty_id only → restrict to all depts in that faculty
-        4. Neither → super-admin (no restriction)
+        1. Company admin / system owner → no department restriction
+        2. Student → department_id + faculty_id + semester_id + semester_number
+        3. Staff with department_id → restrict to that department
+        4. Staff with faculty_id only → restrict to all depts in that faculty
+        5. Neither → admin (no restriction)
         """
         uid = self._current_user_id()
         base: Dict[str, Any] = {
@@ -458,6 +478,9 @@ class MaterialsRepo:
         }
         if uid is None:
             return base
+
+        if self._is_company_admin():
+            return {**base, "profile_type": "admin"}
 
         # Student profile
         sp = (
@@ -670,6 +693,7 @@ class MaterialsRepo:
         """Student-facing base statement - includes user interactions."""
         uid = self._current_user_id() or 0
         scope = self._current_user_scope(company_id=company_id)
+        filters = self._sanitize_list_filters(filters, scope)
 
         use_sem = self._use_semester_priority(scope=scope, filters=filters)
         sem_prio = self._semester_priority_expr(scope.get("semester_number")) if use_sem else None
@@ -759,6 +783,7 @@ class MaterialsRepo:
         Admins see ALL materials (disabled ones too) unless filtered.
         """
         scope = self._current_user_scope(company_id=company_id)
+        filters = self._sanitize_list_filters(filters, scope)
 
         stmt = (
             select(
@@ -806,6 +831,10 @@ class MaterialsRepo:
         stmt = self._apply_scope(stmt, scope)
 
         # Admin filters
+        if filters.get("department_id"):
+            stmt = stmt.where(CourseOffering.department_id == int(filters["department_id"]))
+        if filters.get("faculty_id"):
+            stmt = stmt.where(Faculty.id == int(filters["faculty_id"]))
         if filters.get("course_offering_id"):
             stmt = stmt.where(CourseOffering.id == int(filters["course_offering_id"]))
         if filters.get("chapter_id"):
@@ -1226,6 +1255,8 @@ class MaterialsRepo:
 
         if scope is None:
             scope = self._current_user_scope(company_id=company_id)
+
+        filters = self._sanitize_list_filters(filters, scope)
 
         stmt = (
             select(
